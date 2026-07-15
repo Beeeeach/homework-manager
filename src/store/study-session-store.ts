@@ -34,6 +34,8 @@ interface StudySessionState {
     actualAmount: number
     actualMinutes: number
   }) => void
+  /** 全ての学習記録をリセットする（全データ削除機能用） */
+  resetAll: () => void
 }
 
 function nowIso(): string {
@@ -85,5 +87,9 @@ export const useStudySessionStore = create<StudySessionState>((set, get) => ({
       recordMethod: 'manual',
     }
     set((state) => ({ sessions: [...state.sessions, session] }))
+  },
+
+  resetAll: () => {
+    set({ sessions: [], running: null })
   },
 }))
