@@ -1,14 +1,15 @@
 /**
- * 1日分のスケジュール生成（仕様書 10.2①〜③の統合）
+ * 1日分のスケジュール生成（仕様書 10.2①〜③の統合・改訂版）
  *
  * 特定の1日について、対象となる全宿題の優先度・日付重みからスコアを算出し、
- * その日のcapacityを按分する。フェーズ4のリスケジュールエンジンからも
+ * その日のcapacityを集中配分方式で割り当てる。フェーズ4のリスケジュールエンジンからも
  * この関数を再利用する想定。
  */
 
 import type { Assignment, DateString } from '../domain'
-import { calculatePriority } from './priority'
+import { calculatePriority, isUrgent } from './priority'
 import { getDayWeight, getCapacityMinutes } from './day-weight'
+import { getRemainingMinutes } from './remaining-time'
 import { allocateCapacity } from './allocate-capacity'
 import type { AllocationResult } from './allocate-capacity'
 import type { UserSettings } from '../domain'
@@ -36,7 +37,7 @@ export function scheduleForDay(
   const scored = assignments
     .filter((a) => !a.isCompleted)
     .map((a) => {
-      const priorityScore = calculatePriority(a, date)
+      const priorityScore = calculatePriority(a, date, settings)
       const finalScore = priorityScore * dayWeight
       return { assignment: a, priorityScore, finalScore }
     })
@@ -44,6 +45,8 @@ export function scheduleForDay(
   const allocationInputs = scored.map((s) => ({
     assignmentId: s.assignment.id,
     score: s.finalScore,
+    remainingMinutes: getRemainingMinutes(s.assignment),
+    isUrgent: isUrgent(date, s.assignment.deadline),
   }))
 
   const results = allocateCapacity(capacityMinutes, allocationInputs)
