@@ -10,6 +10,8 @@ import { createEmptySnapshot } from './repository'
 import { useAppDataStore } from '../store/app-data-store'
 import { useStudySessionStore } from '../store/study-session-store'
 import type { LearningRecordStore } from '../engine/learning-store'
+import { DEFAULT_DEADLINE_BUFFER } from '../domain/settings'
+import type { UserSettings } from '../domain'
 
 /** 現在の全ストアの状態からスナップショットを作る */
 function buildSnapshot(learningStore: LearningRecordStore) {
@@ -25,6 +27,17 @@ function buildSnapshot(learningStore: LearningRecordStore) {
   }
 }
 
+/**
+ * 旧バージョンで保存されたsettings（deadlineBufferフィールドが存在しない）を
+ * 読み込んだ場合に、デフォルト値を補って新しい形に揃える。
+ * 新規保存分は既にdeadlineBufferを持っているため、この関数は何もしない（そのまま返す）。
+ */
+function withDeadlineBufferFallback(settings: UserSettings | null): UserSettings | null {
+  if (!settings) return settings
+  if (settings.deadlineBuffer) return settings
+  return { ...settings, deadlineBuffer: DEFAULT_DEADLINE_BUFFER }
+}
+
 /** アプリ起動時にリポジトリからスナップショットを読み込み、各ストアへ反映する */
 export async function hydrateFromRepository(
   repository: AppRepository,
@@ -32,7 +45,7 @@ export async function hydrateFromRepository(
   const snapshot = (await repository.load()) ?? createEmptySnapshot()
 
   useAppDataStore.setState({
-    settings: snapshot.settings,
+    settings: withDeadlineBufferFallback(snapshot.settings),
     assignments: snapshot.assignments,
     isSetupComplete: snapshot.isSetupComplete,
   })
