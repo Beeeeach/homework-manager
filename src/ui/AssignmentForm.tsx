@@ -2,6 +2,9 @@
  * 宿題登録フォーム（仕様書 6章⑤、7章の4タイプテンプレート）
  * 登録のたびにオーバーロードチェック（9章）を実行し、警告があれば表示するが
  * 登録自体はブロックしない。
+ *
+ * 初回設定フロー以外（設定完了後のタブ）からも呼び出せるようにするため、
+ * finishLabelで「登録を終える」ボタンの文言を切り替え可能にしている。
  */
 
 import { useState } from 'react'
@@ -24,6 +27,8 @@ interface AssignmentFormProps {
   currentDate: string
   onAdd: (assignment: Assignment) => void
   onFinish: () => void
+  /** 「登録を終える」ボタンの表示文言。省略時は「登録を終える」（初回設定フロー用のデフォルト） */
+  finishLabel?: string
 }
 
 const TYPE_LABELS: Record<HomeworkType, string> = {
@@ -39,6 +44,7 @@ export function AssignmentForm({
   currentDate,
   onAdd,
   onFinish,
+  finishLabel = '登録を終える',
 }: AssignmentFormProps) {
   const [type, setType] = useState<HomeworkType>('page')
   const [title, setTitle] = useState('')
@@ -294,7 +300,7 @@ export function AssignmentForm({
           onClick={onFinish}
           className="flex-1 rounded-md bg-slate-100 py-2 text-sm font-medium text-slate-600"
         >
-          登録を終える
+          {finishLabel}
         </button>
       </div>
 
