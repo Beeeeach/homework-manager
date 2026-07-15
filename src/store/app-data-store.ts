@@ -14,6 +14,8 @@ interface AppDataState {
   setSettings: (settings: UserSettings) => void
   addAssignment: (assignment: Assignment) => void
   completeSetup: () => void
+  /** 全データを初期状態に戻す（設定・宿題・完了フラグすべてリセット） */
+  resetAll: () => void
 }
 
 export const useAppDataStore = create<AppDataState>((set) => ({
@@ -25,4 +27,10 @@ export const useAppDataStore = create<AppDataState>((set) => ({
   addAssignment: (assignment) =>
     set((state) => ({ assignments: [...state.assignments, assignment] })),
   completeSetup: () => set({ isSetupComplete: true }),
+  resetAll: () =>
+    set({
+      settings: null,
+      assignments: [],
+      isSetupComplete: false,
+    }),
 }))
