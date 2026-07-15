@@ -45,10 +45,37 @@ export interface SpecialSchedule {
   durationMinutesPerDay: number
 }
 
+/**
+ * ⑤ 締切バッファ設定
+ * 優先度計算（10.2①）で使う「実効締切」を実際の締切より前倒しすることで、
+ * 本来の締切ぎりぎりまで使い切るスケジュールではなく、
+ * 数日分の余裕を持って終わるスケジュールを組むための設定。
+ *
+ * mode:
+ *   'fixed'    - 常に固定日数分（fixedDays）前倒しする
+ *   'percentage' - 締切までの残り日数に対する割合（percentage、0〜1）分前倒しする
+ * どちらの場合も、前倒し後の残り日数は最低1日を下回らない（ゼロ除算・負値を防ぐ）。
+ */
+export interface DeadlineBufferSettings {
+  mode: 'fixed' | 'percentage'
+  /** mode: 'fixed' のときに使う前倒し日数 */
+  fixedDays: number
+  /** mode: 'percentage' のときに使う前倒し割合（0〜1） */
+  percentage: number
+}
+
 /** 初回設定全体をまとめたもの */
 export interface UserSettings {
   vacationPeriod: VacationPeriod
   weekdayStudyMinutes: WeekdayStudyMinutes
   recurringSchedules: RecurringSchedule[]
   specialSchedules: SpecialSchedule[]
+  deadlineBuffer: DeadlineBufferSettings
+}
+
+/** deadlineBufferのデフォルト値（固定2日前倒し） */
+export const DEFAULT_DEADLINE_BUFFER: DeadlineBufferSettings = {
+  mode: 'fixed',
+  fixedDays: 2,
+  percentage: 0.2,
 }
