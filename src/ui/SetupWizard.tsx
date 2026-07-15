@@ -1,16 +1,18 @@
 /**
- * 初回設定ウィザード（仕様書 6章 ①〜④）
+ * 初回設定ウィザード（仕様書 6章 ①〜④、および締切バッファ設定を追加）
  * 目標時間3分以内で完了できることを意識し、入力項目を最小限に絞る。
  */
 
 import { useState } from 'react'
 import type {
+  DeadlineBufferSettings,
   RecurringSchedule,
   SpecialSchedule,
   UserSettings,
   Weekday,
   WeekdayStudyMinutes,
 } from '../domain'
+import { DEFAULT_DEADLINE_BUFFER } from '../domain/settings'
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   0: '日',
@@ -46,6 +48,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
 
   const [recurringSchedules, setRecurringSchedules] = useState<RecurringSchedule[]>([])
   const [specialSchedules, setSpecialSchedules] = useState<SpecialSchedule[]>([])
+  const [deadlineBuffer, setDeadlineBuffer] = useState<DeadlineBufferSettings>(
+    DEFAULT_DEADLINE_BUFFER,
+  )
 
   function addRecurring() {
     setRecurringSchedules((prev) => [
@@ -93,13 +98,14 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       weekdayStudyMinutes: weekdayMinutes,
       recurringSchedules,
       specialSchedules,
+      deadlineBuffer,
     })
   }
 
   return (
     <div className="mx-auto max-w-md">
       <div className="mb-4 flex items-center gap-1 text-xs text-slate-400">
-        {[1, 2, 3, 4].map((n) => (
+        {[1, 2, 3, 4, 5].map((n) => (
           <div
             key={n}
             className={`h-1 flex-1 rounded-full ${
@@ -301,6 +307,100 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             <button
               type="button"
               onClick={() => setStep(3)}
+              className="flex-1 rounded-md bg-slate-100 py-2 text-sm font-medium text-slate-600"
+            >
+              戻る
+            </button>
+            <button
+              type="button"
+              onClick={() => setStep(5)}
+              className="flex-1 rounded-md bg-indigo-600 py-2 text-sm font-medium text-white"
+            >
+              次へ
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 5 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-700">⑤ 締切に対する余裕（バッファ）</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            締切ぎりぎりではなく、少し早めに終わるようにスケジュールを組みます。
+          </p>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setDeadlineBuffer((prev) => ({ ...prev, mode: 'fixed' }))}
+              className={`flex-1 rounded-md py-2 text-xs font-medium ${
+                deadlineBuffer.mode === 'fixed'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              固定日数
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeadlineBuffer((prev) => ({ ...prev, mode: 'percentage' }))}
+              className={`flex-1 rounded-md py-2 text-xs font-medium ${
+                deadlineBuffer.mode === 'percentage'
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              割合で指定
+            </button>
+          </div>
+
+          {deadlineBuffer.mode === 'fixed' && (
+            <label className="mt-3 block text-xs text-slate-500">
+              何日前倒しで終わらせるか
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  value={deadlineBuffer.fixedDays}
+                  onChange={(e) =>
+                    setDeadlineBuffer((prev) => ({
+                      ...prev,
+                      fixedDays: Number(e.target.value),
+                    }))
+                  }
+                  className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-slate-400">日前</span>
+              </div>
+            </label>
+          )}
+
+          {deadlineBuffer.mode === 'percentage' && (
+            <label className="mt-3 block text-xs text-slate-500">
+              残り日数のうち何%を余裕として残すか
+              <div className="mt-1 flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  max={90}
+                  value={Math.round(deadlineBuffer.percentage * 100)}
+                  onChange={(e) =>
+                    setDeadlineBuffer((prev) => ({
+                      ...prev,
+                      percentage: Number(e.target.value) / 100,
+                    }))
+                  }
+                  className="w-24 rounded-md border border-slate-300 px-2 py-1 text-sm"
+                />
+                <span className="text-xs text-slate-400">%</span>
+              </div>
+            </label>
+          )}
+
+          <div className="mt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
               className="flex-1 rounded-md bg-slate-100 py-2 text-sm font-medium text-slate-600"
             >
               戻る
