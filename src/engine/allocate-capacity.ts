@@ -1,31 +1,44 @@
 /**
- * 割当ロジック（Allocation Logic）（仕様書 10.2③）
+ * 割当ロジック（Allocation Logic）（仕様書 10.2③・改訂版）
  *
- * その日のcapacityを、対象となる全宿題のスコア比率で按分する。
+ * 【改訂の背景】
+ * 旧方式はその日のcapacityを対象宿題全件でスコア比率按分していたため、
+ * 「5件あれば5件全部を毎日少しずつ」になり非効率だった。
+ * 改訂版は、優先度スコアの高い宿題から順に「BLOCK_MINUTES以上のまとまった時間」を
+ * 割り当てる集中配分方式に変更する。
  *
- *   1. その日のcapacityを確定する
- *   2. score(assignment) = 優先度(assignment) × 日付重み(day) を算出する
- *   3. 各宿題への配分時間 = capacity × (score ÷ Σscore)
- *   4. 下限時間未満になる宿題は当日の割当から除外し、除外分のcapacityを
- *      残りの宿題で再按分する
- *   5. 端数は優先度最上位の宿題に加算する
- *
- * 手順4は「除外 → 再按分」で新たに下限時間未満の宿題が発生しうるため、
- * 全員が下限時間以上になるか、対象がいなくなるまで繰り返す。
+ * 【アルゴリズム】
+ *   1. スコアの高い順に対象宿題をソートする
+ *   2. 上から順に、以下を「残りcapacityが尽きる」「対象がなくなる」
+ *      「割当件数がMAX_ASSIGNMENTS_PER_DAYに達する」のいずれかまで繰り返す:
+ *        a. 割当候補 = min(その宿題の残り予想時間, 残りcapacity)
+ *        b. 割当候補 >= BLOCK_MINUTES なら、その分を配分し、
+ *           残りcapacityを減らし、割当件数を1増やして次の宿題へ
+ *        c. 割当候補 < BLOCK_MINUTES の場合:
+ *             - 緊急（今日を含め残り1日しかない）なら、候補分をそのまま配分する
+ *               （終わらないよりはマシなので、少量でも実行する）
+ *             - 緊急でなければこの宿題はスキップ（0分）し、次の宿題を試す
+ *               （件数にはカウントしない＝上限を消費しない）
+ *   3. 余ったcapacityがあっても、上限件数や候補切れで打ち切られた場合は
+ *      次の宿題には回さない（意図的に余らせる。集中配分の趣旨のため）
  */
 
-import { MIN_ALLOCATION_MINUTES } from '../config/constants'
+import { BLOCK_MINUTES, MAX_ASSIGNMENTS_PER_DAY } from '../config/constants'
 
 export interface AllocationInput {
   assignmentId: string
   /** score(assignment) = 優先度 × 日付重み（呼び出し側で事前に算出しておく） */
   score: number
+  /** その宿題の残り予想時間（分）。集中配分では「まとめてどれだけ進められるか」の上限として使う */
+  remainingMinutes: number
+  /** 緊急フラグ。今日を含め残り1日しかない場合true（isUrgentで判定、呼び出し側で算出） */
+  isUrgent: boolean
 }
 
 export interface AllocationResult {
   assignmentId: string
   allocatedMinutes: number
-  /** 下限時間未満のため除外されたか */
+  /** 下限ブロック未満のため、その日はスキップされたか */
   excludedByMinimum: boolean
 }
 
@@ -41,76 +54,61 @@ export function allocateCapacity(
     }))
   }
 
-  // スコアが0以下のものは最初から対象外（配分しても0になるだけなので）
-  let active = inputs.filter((i) => i.score > 0)
-  const excluded = inputs.filter((i) => i.score <= 0)
+  // スコアが0以下（完了扱い等）のものは対象外
+  const scored = inputs.filter((i) => i.score > 0)
+  const zeroScored = inputs.filter((i) => i.score <= 0)
 
-  if (active.length === 0) {
-    return inputs.map((i) => ({
-      assignmentId: i.assignmentId,
-      allocatedMinutes: 0,
-      excludedByMinimum: true,
-    }))
-  }
+  // スコアの高い順にソート（同スコアの場合は入力順を保つ）
+  const sorted = [...scored].sort((a, b) => b.score - a.score)
 
+  const results: AllocationResult[] = []
   let remainingCapacity = capacityMinutes
-  const excludedResults: AllocationResult[] = excluded.map((i) => ({
-    assignmentId: i.assignmentId,
-    allocatedMinutes: 0,
-    excludedByMinimum: true,
-  }))
+  let assignedCount = 0
 
-  // 手順3〜4: 下限時間未満が出なくなるまで按分を繰り返す
-  let allocations: Map<string, number> = new Map()
-
-  // eslint-disable-next-line no-constant-condition
-  while (true) {
-    const totalScore = active.reduce((sum, i) => sum + i.score, 0)
-    allocations = new Map(
-      active.map((i) => [i.assignmentId, remainingCapacity * (i.score / totalScore)]),
-    )
-
-    const belowMinimum = active.filter(
-      (i) => (allocations.get(i.assignmentId) ?? 0) < MIN_ALLOCATION_MINUTES,
-    )
-
-    if (belowMinimum.length === 0) {
-      break
+  for (const item of sorted) {
+    if (remainingCapacity <= 0 || assignedCount >= MAX_ASSIGNMENTS_PER_DAY) {
+      results.push({
+        assignmentId: item.assignmentId,
+        allocatedMinutes: 0,
+        excludedByMinimum: true,
+      })
+      continue
     }
 
-    // 下限未満のものを除外し、そのcapacity分を差し引いて残りで再按分
-    for (const item of belowMinimum) {
-      excludedResults.push({
+    const candidate = Math.min(item.remainingMinutes, remainingCapacity)
+
+    if (candidate >= BLOCK_MINUTES) {
+      results.push({
+        assignmentId: item.assignmentId,
+        allocatedMinutes: candidate,
+        excludedByMinimum: false,
+      })
+      remainingCapacity -= candidate
+      assignedCount += 1
+    } else if (item.isUrgent && candidate > 0) {
+      // 緊急: ブロック未満でも今日やらないと終わらないため実行する
+      results.push({
+        assignmentId: item.assignmentId,
+        allocatedMinutes: candidate,
+        excludedByMinimum: false,
+      })
+      remainingCapacity -= candidate
+      assignedCount += 1
+    } else {
+      // 緊急でなく、まとまった時間も取れない場合はスキップ（次の日に回す）
+      results.push({
         assignmentId: item.assignmentId,
         allocatedMinutes: 0,
         excludedByMinimum: true,
       })
     }
-    active = active.filter((i) => !belowMinimum.includes(i))
-
-    if (active.length === 0) {
-      allocations = new Map()
-      break
-    }
-    // remainingCapacityは変えない（除外された分は「残りの宿題で再按分」＝
-    // 全capacityを残りの宿題だけで按分し直すことと同義）
   }
 
-  // 手順5: 端数を優先度最上位（スコア最大）の宿題に加算する
-  if (active.length > 0) {
-    const allocatedSum = Array.from(allocations.values()).reduce((a, b) => a + b, 0)
-    const remainder = remainingCapacity - allocatedSum
-    if (Math.abs(remainder) > 1e-9) {
-      const top = active.reduce((best, cur) => (cur.score > best.score ? cur : best))
-      allocations.set(top.assignmentId, (allocations.get(top.assignmentId) ?? 0) + remainder)
-    }
-  }
-
-  const activeResults: AllocationResult[] = active.map((i) => ({
+  const zeroResults: AllocationResult[] = zeroScored.map((i) => ({
     assignmentId: i.assignmentId,
-    allocatedMinutes: allocations.get(i.assignmentId) ?? 0,
-    excludedByMinimum: false,
+    allocatedMinutes: 0,
+    excludedByMinimum: true,
   }))
 
-  return [...activeResults, ...excludedResults]
+  return [...results, ...zeroResults]
 }
