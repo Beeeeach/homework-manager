@@ -106,3 +106,24 @@ export const CREATIVE_MINUTES_PER_CHAR = 0.5
  * 推定合計時間(分) = 工程数 × MINUTES_PER_PHASE
  */
 export const PROJECT_MINUTES_PER_PHASE = 90
+
+
+/**
+ * 以下は既存の config/constants.ts の末尾に追加してください。
+ * （集中配分ロジックのための新規定数）
+ */
+
+/**
+ * 集中配分の1ブロックあたりの時間（分）（新: 10.2③改訂）
+ * この時間未満しか配分できない宿題は、緊急でない限りその日はスキップし、
+ * 別の宿題にcapacityを回す。MIN_ALLOCATION_MINUTES（下限除外用、既存の按分ロジックが
+ * 使用）とは目的が異なるため別定数として持つ。
+ */
+export const BLOCK_MINUTES = 30
+
+/**
+ * 1日に手をつける宿題の最大件数（新: 10.2③改訂）
+ * 集中配分で「毎日全部に少しずつ」を避けるための上限。
+ * これを超える分は、capacityが余っていてもその日は割り当てない。
+ */
+export const MAX_ASSIGNMENTS_PER_DAY = 3
