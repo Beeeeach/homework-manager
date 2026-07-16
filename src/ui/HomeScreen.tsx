@@ -111,6 +111,13 @@ export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
                 <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
                   <span>
                     {task.subject} ・ 予定{Math.round(task.plannedMinutes)}分
+                    {task.plannedAmount !== undefined && task.unitLabel && (
+                      <>
+                        {' '}
+                        （約{Math.ceil(task.plannedAmount)}
+                        {task.unitLabel}）
+                      </>
+                    )}
                   </span>
                   <div className="flex gap-1">
                     <button
