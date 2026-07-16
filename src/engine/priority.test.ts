@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { calculatePriority, getRemainingDays } from './priority'
-import { makePageAssignment, makeCreativeAssignment, makeProjectAssignment } from '../domain/test-factories'
+import {
+  makePageAssignment,
+  makeCreativeAssignment,
+  makeProjectAssignment,
+  makeUserSettings,
+} from '../domain/test-factories'
+
+// バッファの影響を受けずに旧仕様どおりの数値を検証するため、
+// テストでは「バッファなし」に相当する設定（fixedDays: 0）を使う。
+const noBufferSettings = makeUserSettings({
+  deadlineBuffer: { mode: 'fixed', fixedDays: 0, percentage: 0 },
+})
 
 describe('getRemainingDays', () => {
   it('締切当日は残り1日として数える', () => {
@@ -25,8 +36,8 @@ describe('calculatePriority', () => {
       estimatedMinutesPerPage: 4,
       deadline: '2026-07-25',
     })
-    // 残り時間120分、残り日数 = diff(7/20,7/25)+1 = 6
-    const priority = calculatePriority(a, '2026-07-20')
+    // 残り時間120分、残り日数 = diff(7/20,7/25)+1 = 6（バッファなし）
+    const priority = calculatePriority(a, '2026-07-20', noBufferSettings)
     expect(priority).toBeCloseTo(120 / 6)
   })
 
@@ -35,7 +46,7 @@ describe('calculatePriority', () => {
       estimatedTotalMinutes: 600,
       deadline: '2026-07-25',
     })
-    const priority = calculatePriority(a, '2026-07-20')
+    const priority = calculatePriority(a, '2026-07-20', noBufferSettings)
     // 残り時間600分（全工程未着手）、残り日数6、係数1.2
     expect(priority).toBeCloseTo((600 / 6) * 1.2)
   })
@@ -45,13 +56,13 @@ describe('calculatePriority', () => {
       estimatedTotalMinutes: 540,
       deadline: '2026-07-25',
     })
-    const priority = calculatePriority(a, '2026-07-20')
+    const priority = calculatePriority(a, '2026-07-20', noBufferSettings)
     expect(priority).toBeCloseTo((540 / 6) * 1.3)
   })
 
   it('残り時間が0（完了済み）なら優先度は0', () => {
     const a = makePageAssignment({ totalPages: 10, currentPage: 10 })
-    expect(calculatePriority(a, '2026-07-20')).toBe(0)
+    expect(calculatePriority(a, '2026-07-20', noBufferSettings)).toBe(0)
   })
 
   it('締切が近いほど優先度が高くなる', () => {
@@ -67,8 +78,8 @@ describe('calculatePriority', () => {
       estimatedMinutesPerPage: 4,
       deadline: '2026-08-31',
     })
-    const pNear = calculatePriority(nearDeadline, '2026-07-20')
-    const pFar = calculatePriority(farDeadline, '2026-07-20')
+    const pNear = calculatePriority(nearDeadline, '2026-07-20', noBufferSettings)
+    const pFar = calculatePriority(farDeadline, '2026-07-20', noBufferSettings)
     expect(pNear).toBeGreaterThan(pFar)
   })
 })
