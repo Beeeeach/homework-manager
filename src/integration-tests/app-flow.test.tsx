@@ -37,8 +37,13 @@ describe('結合テスト(UI): 初回設定 → 宿題登録 → ホーム画面
     fireEvent.change(subjectInput, { target: { value: '数学' } })
     fireEvent.click(screen.getByText('この宿題を追加'))
 
-    // 登録済みリストに反映される
-    expect(await screen.findByText(/数学ワーク（ページ型/)).toBeInTheDocument()
+    // 登録済みリストに反映される（「・」と本文が別テキストノードに分かれるため、
+    // 要素のtextContent全体で判定する関数マッチャーを使う）
+    expect(
+      await screen.findByText((_, element) =>
+        Boolean(element?.textContent?.includes('数学ワーク（ページ管理')),
+      ),
+    ).toBeInTheDocument()
 
     // 登録を終えてホーム画面へ
     fireEvent.click(screen.getByText('登録を終える'))
