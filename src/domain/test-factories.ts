@@ -15,6 +15,7 @@ import type {
   UserSettings,
   WeekdayStudyMinutes,
 } from '.'
+import { DEFAULT_DEADLINE_BUFFER } from './settings'
 
 let idCounter = 0
 export function nextId(prefix: string): string {
@@ -169,6 +170,7 @@ export function makeUserSettings(
     weekdayStudyMinutes: defaultWeekdayStudyMinutes,
     recurringSchedules: [],
     specialSchedules: [],
+    deadlineBuffer: DEFAULT_DEADLINE_BUFFER,
     ...overrides,
   }
 }
