@@ -5,21 +5,24 @@
  *
  * 初回設定フロー以外（設定完了後のタブ）からも呼び出せるようにするため、
  * finishLabelで「登録を終える」ボタンの文言を切り替え可能にしている。
+ *
+ * 変更点:
+ *   - ページ型の「単位」（ページ/章/問など）を自由入力できるようにした（unitLabel）
+ *   - 1ページ当たり時間をプリセット選択ではなく数値の直接入力にした
+ *   - 登録済みリストから宿題を削除できるようにした（即削除、確認なし）
  */
 
 import { useState } from 'react'
-import type { Assignment, UserSettings } from '../domain'
+import type { Assignment, Id } from '../domain'
+import type { UserSettings } from '../domain'
 import type { HomeworkType } from '../config/constants'
-import {
-  CREATIVE_TEMPLATE_PHASES,
-  PROJECT_TEMPLATE_PHASES,
-  PAGE_TIME_PRESETS_MINUTES,
-} from '../config/constants'
+import { CREATIVE_TEMPLATE_PHASES, PROJECT_TEMPLATE_PHASES } from '../config/constants'
 import { checkOverload } from '../engine/overload-check'
 import {
   estimateCreativeTotalMinutes,
   estimateProjectTotalMinutes,
 } from '../engine/estimate-total-minutes'
+import { getPageUnitLabel } from '../domain/assignment'
 
 interface AssignmentFormProps {
   existingAssignments: Assignment[]
@@ -27,6 +30,8 @@ interface AssignmentFormProps {
   currentDate: string
   onAdd: (assignment: Assignment) => void
   onFinish: () => void
+  /** 宿題を削除する。省略時は削除ボタンを表示しない */
+  onDelete?: (assignmentId: Id) => void
   /** 「登録を終える」ボタンの表示文言。省略時は「登録を終える」（初回設定フロー用のデフォルト） */
   finishLabel?: string
 }
@@ -38,12 +43,20 @@ const TYPE_LABELS: Record<HomeworkType, string> = {
   project: 'プロジェクト型（自由研究など）',
 }
 
+function assignmentSummaryLabel(a: Assignment): string {
+  if (a.type === 'page') {
+    return `${a.title}（${getPageUnitLabel(a)}管理、締切${a.deadline}）`
+  }
+  return `${a.title}（${TYPE_LABELS[a.type]}、締切${a.deadline}）`
+}
+
 export function AssignmentForm({
   existingAssignments,
   settings,
   currentDate,
   onAdd,
   onFinish,
+  onDelete,
   finishLabel = '登録を終える',
 }: AssignmentFormProps) {
   const [type, setType] = useState<HomeworkType>('page')
@@ -52,11 +65,10 @@ export function AssignmentForm({
   const [deadline, setDeadline] = useState(settings.vacationPeriod.endDate)
 
   // ページ型
+  const [unitLabel, setUnitLabel] = useState('ページ')
   const [totalPages, setTotalPages] = useState('40')
   const [currentPage, setCurrentPage] = useState('0')
-  const [minutesPerPage, setMinutesPerPage] = useState(
-    String(PAGE_TIME_PRESETS_MINUTES[1].value),
-  )
+  const [minutesPerPage, setMinutesPerPage] = useState('4')
 
   // 反復型
   const [totalItems, setTotalItems] = useState('100')
@@ -84,6 +96,7 @@ export function AssignmentForm({
         totalPages: Number(totalPages),
         currentPage: Number(currentPage),
         estimatedMinutesPerPage: Number(minutesPerPage),
+        unitLabel: unitLabel.trim() || 'ページ',
       }
     }
     if (type === 'repetition') {
@@ -199,9 +212,19 @@ export function AssignmentForm({
 
       {type === 'page' && (
         <div className="mt-2 space-y-2">
+          <label className="block text-xs text-slate-500">
+            数える単位（例: ページ、章、問、回）
+            <input
+              type="text"
+              value={unitLabel}
+              onChange={(e) => setUnitLabel(e.target.value)}
+              placeholder="ページ"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+          </label>
           <div className="flex gap-2">
             <label className="flex-1 text-xs text-slate-500">
-              総ページ数
+              総{unitLabel || 'ページ'}数
               <input
                 type="number"
                 value={totalPages}
@@ -210,7 +233,7 @@ export function AssignmentForm({
               />
             </label>
             <label className="flex-1 text-xs text-slate-500">
-              現在ページ
+              現在の{unitLabel || 'ページ'}
               <input
                 type="number"
                 value={currentPage}
@@ -220,18 +243,15 @@ export function AssignmentForm({
             </label>
           </div>
           <label className="block text-xs text-slate-500">
-            1ページ当たり時間
-            <select
+            1{unitLabel || 'ページ'}あたりの予想時間（分）
+            <input
+              type="number"
+              step="0.5"
+              min="0"
               value={minutesPerPage}
               onChange={(e) => setMinutesPerPage(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-            >
-              {PAGE_TIME_PRESETS_MINUTES.map((p) => (
-                <option key={p.label} value={p.value}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
+            />
           </label>
         </div>
       )}
@@ -251,6 +271,7 @@ export function AssignmentForm({
             1個あたり時間（分）
             <input
               type="number"
+              step="0.1"
               value={minutesPerItem}
               onChange={(e) => setMinutesPerItem(e.target.value)}
               className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
@@ -307,8 +328,18 @@ export function AssignmentForm({
       {existingAssignments.length > 0 && (
         <ul className="mt-3 space-y-1 text-xs text-slate-500">
           {existingAssignments.map((a) => (
-            <li key={a.id}>
-              ・{a.title}（{TYPE_LABELS[a.type]}、締切{a.deadline}）
+            <li key={a.id} className="flex items-center justify-between gap-2">
+              <span>・{assignmentSummaryLabel(a)}</span>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(a.id)}
+                  className="shrink-0 text-rose-500"
+                  aria-label={`${a.title}を削除`}
+                >
+                  削除
+                </button>
+              )}
             </li>
           ))}
         </ul>
