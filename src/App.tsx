@@ -5,6 +5,7 @@ import { HomeScreen } from './ui/HomeScreen'
 import { UpcomingView } from './ui/UpcomingView'
 import { ProgressView } from './ui/ProgressView'
 import { ResetConfirmView } from './ui/ResetConfirmView'
+import { SettingsEditView } from './ui/SettingsEditView'
 import { useAppDataStore } from './store/app-data-store'
 import { useStudySessionStore } from './store/study-session-store'
 import { createLocalStorageRepository } from './data/local-storage-repository'
@@ -14,18 +15,27 @@ import type { LearningRecordStore } from './engine/learning-store'
 const TODAY = '2026-07-20'
 const repository = createLocalStorageRepository()
 
-type Tab = 'home' | 'upcoming' | 'progress' | 'add' | 'reset'
+type Tab = 'home' | 'upcoming' | 'progress' | 'add' | 'settings' | 'reset'
 
 const TAB_LABELS: Record<Exclude<Tab, 'reset'>, string> = {
   home: '今日',
   upcoming: '予定',
   progress: '進捗',
   add: '宿題追加',
+  settings: '設定',
 }
 
 function App() {
-  const { settings, assignments, isSetupComplete, setSettings, addAssignment, completeSetup } =
-    useAppDataStore()
+  const {
+    settings,
+    assignments,
+    isSetupComplete,
+    setSettings,
+    updateSettings,
+    addAssignment,
+    deleteAssignment,
+    completeSetup,
+  } = useAppDataStore()
   const resetAllAppData = useAppDataStore((s) => s.resetAll)
   const resetAllSessions = useStudySessionStore((s) => s.resetAll)
   const sessions = useStudySessionStore((s) => s.sessions)
@@ -72,7 +82,7 @@ function App() {
           <h1 className="text-xl font-bold text-slate-800">宿題マネージャー</h1>
         </div>
 
-        <nav className="mx-auto mb-4 flex max-w-md gap-1 rounded-xl bg-slate-100 p-1">
+        <nav className="mx-auto mb-4 flex max-w-md flex-wrap gap-1 rounded-xl bg-slate-100 p-1">
           {(Object.keys(TAB_LABELS) as Exclude<Tab, 'reset'>[]).map((tab) => (
             <button
               key={tab}
@@ -114,8 +124,19 @@ function App() {
             settings={settings}
             currentDate={TODAY}
             onAdd={addAssignment}
+            onDelete={deleteAssignment}
             onFinish={() => setActiveTab('home')}
             finishLabel="ホームに戻る"
+          />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsEditView
+            settings={settings}
+            onSave={(next) => {
+              updateSettings(next)
+              setActiveTab('home')
+            }}
+            onCancel={() => setActiveTab('home')}
           />
         )}
         {activeTab === 'reset' && (
@@ -148,6 +169,7 @@ function App() {
           settings={settings}
           currentDate={TODAY}
           onAdd={addAssignment}
+          onDelete={deleteAssignment}
           onFinish={completeSetup}
         />
       )}
