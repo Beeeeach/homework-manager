@@ -15,6 +15,7 @@
  */
 
 import type { Assignment } from '../domain'
+import { getTotalRequiredItems } from '../domain/assignment'
 
 /**
  * 指定した分数だけ進捗したと仮定した、Assignmentのコピーを返す。
@@ -38,10 +39,8 @@ export function applyVirtualProgress(
     }
     case 'repetition': {
       const itemsAdvanced = allocatedMinutes / assignment.estimatedMinutesPerItem
-      const nextCompletedItems = Math.min(
-        assignment.totalItems,
-        assignment.completedItems + itemsAdvanced,
-      )
+      const totalRequired = getTotalRequiredItems(assignment)
+      const nextCompletedItems = Math.min(totalRequired, assignment.completedItems + itemsAdvanced)
       return { ...assignment, completedItems: nextCompletedItems }
     }
     case 'creative':
