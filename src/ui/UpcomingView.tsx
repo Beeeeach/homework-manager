@@ -53,7 +53,12 @@ export function UpcomingView({ date, assignments, settings }: UpcomingViewProps)
                 <span>
                   {task.subject} ・ {task.title}
                 </span>
-                <span className="text-slate-400">{Math.round(task.plannedMinutes)}分</span>
+                <span className="text-slate-400">
+                  {Math.round(task.plannedMinutes)}分
+                  {task.plannedAmount !== undefined && task.unitLabel && (
+                    <> （約{Math.ceil(task.plannedAmount)}{task.unitLabel}）</>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
