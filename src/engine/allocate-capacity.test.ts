@@ -1,79 +1,86 @@
 import { describe, it, expect } from 'vitest'
 import { allocateCapacity } from './allocate-capacity'
+import { BLOCK_MINUTES, MAX_ASSIGNMENTS_PER_DAY } from '../config/constants'
 
-describe('allocateCapacity', () => {
-  it('スコア比率どおりに按分される（基本ケース）', () => {
+describe('allocateCapacity（集中配分方式）', () => {
+  it('スコア最上位から順に、残り時間ぶんまとめて配分される', () => {
     const result = allocateCapacity(100, [
-      { assignmentId: 'a', score: 30 },
-      { assignmentId: 'b', score: 70 },
+      { assignmentId: 'a', score: 30, remainingMinutes: 40, isUrgent: false },
+      { assignmentId: 'b', score: 70, remainingMinutes: 50, isUrgent: false },
     ])
     const a = result.find((r) => r.assignmentId === 'a')!
     const b = result.find((r) => r.assignmentId === 'b')!
-    expect(a.allocatedMinutes).toBeCloseTo(30)
-    expect(b.allocatedMinutes).toBeCloseTo(70)
-    expect(a.excludedByMinimum).toBe(false)
+
+    // スコアが高いbから先に配分される: b=50分（残り時間分）、残り50分をaに配分
+    expect(b.allocatedMinutes).toBeCloseTo(50)
     expect(b.excludedByMinimum).toBe(false)
+    expect(a.allocatedMinutes).toBeCloseTo(40)
+    expect(a.excludedByMinimum).toBe(false)
   })
 
-  it('配分の合計はcapacityと一致する（端数調整込み）', () => {
+  it('配分の合計はcapacityを超えない', () => {
     const result = allocateCapacity(100, [
-      { assignmentId: 'a', score: 33 },
-      { assignmentId: 'b', score: 33 },
-      { assignmentId: 'c', score: 34 },
+      { assignmentId: 'a', score: 33, remainingMinutes: 200, isUrgent: false },
+      { assignmentId: 'b', score: 33, remainingMinutes: 200, isUrgent: false },
+      { assignmentId: 'c', score: 34, remainingMinutes: 200, isUrgent: false },
     ])
     const total = result.reduce((sum, r) => sum + r.allocatedMinutes, 0)
-    expect(total).toBeCloseTo(100)
+    expect(total).toBeLessThanOrEqual(100)
   })
 
-  it('下限時間未満の宿題は除外され、残りで再按分される', () => {
-    // capacity=60分、3件のスコア比率が 1:1:58 だと、均等按分では
-    // 上位2件が 60*(1/60)=1分 になり下限(5分)未満で除外される想定
+  it(`1件に手をつけたら、その宿題の残り時間かcapacity上限まで配分される（${BLOCK_MINUTES}分ブロック未満は次に回さない）`, () => {
+    // capacity=60分、最優先の宿題は残り時間20分（BLOCK_MINUTES=30未満）
+    // 緊急でなければスキップされ、次の宿題に60分そのまま渡る
     const result = allocateCapacity(60, [
-      { assignmentId: 'small1', score: 1 },
-      { assignmentId: 'small2', score: 1 },
-      { assignmentId: 'big', score: 58 },
+      { assignmentId: 'small', score: 100, remainingMinutes: 20, isUrgent: false },
+      { assignmentId: 'big', score: 50, remainingMinutes: 100, isUrgent: false },
     ])
-    const small1 = result.find((r) => r.assignmentId === 'small1')!
-    const small2 = result.find((r) => r.assignmentId === 'small2')!
+    const small = result.find((r) => r.assignmentId === 'small')!
     const big = result.find((r) => r.assignmentId === 'big')!
 
-    expect(small1.excludedByMinimum).toBe(true)
-    expect(small2.excludedByMinimum).toBe(true)
-    expect(small1.allocatedMinutes).toBe(0)
-    expect(small2.allocatedMinutes).toBe(0)
-    // 除外された分がbigに再配分され、bigは全capacityを得る
+    expect(small.excludedByMinimum).toBe(true)
+    expect(small.allocatedMinutes).toBe(0)
     expect(big.allocatedMinutes).toBeCloseTo(60)
+    expect(big.excludedByMinimum).toBe(false)
   })
 
-  it('端数は優先度（スコア）最上位の宿題に加算される', () => {
-    // 3等分すると割り切れないが、下限時間(5分)は超えるケースで検証する
-    const result = allocateCapacity(100, [
-      { assignmentId: 'a', score: 1 },
-      { assignmentId: 'b', score: 1 },
-      { assignmentId: 'c', score: 1 },
+  it('緊急（残り1日）の宿題は、ブロック未満でもスキップされず配分される', () => {
+    const result = allocateCapacity(60, [
+      { assignmentId: 'urgent-small', score: 100, remainingMinutes: 10, isUrgent: true },
+      { assignmentId: 'big', score: 50, remainingMinutes: 100, isUrgent: false },
     ])
-    const total = result.reduce((sum, r) => sum + r.allocatedMinutes, 0)
-    expect(total).toBeCloseTo(100)
-    // 100/3 = 33.33...なので、端数がどれか1件に乗って合計が100ちょうどになっているはず
-    const nonExcluded = result.filter((r) => !r.excludedByMinimum)
-    expect(nonExcluded.length).toBe(3)
+    const urgentSmall = result.find((r) => r.assignmentId === 'urgent-small')!
+    const big = result.find((r) => r.assignmentId === 'big')!
+
+    expect(urgentSmall.excludedByMinimum).toBe(false)
+    expect(urgentSmall.allocatedMinutes).toBeCloseTo(10)
+    // 残り50分がbigに渡る
+    expect(big.allocatedMinutes).toBeCloseTo(50)
   })
 
-  it('全員均等按分だと下限時間未満になる場合は全員除外される（3等分で下限割れ）', () => {
-    // 10分を3等分すると1件あたり約3.33分となり、下限5分未満なので全員除外される
-    const result = allocateCapacity(10, [
-      { assignmentId: 'a', score: 1 },
-      { assignmentId: 'b', score: 1 },
-      { assignmentId: 'c', score: 1 },
-    ])
-    expect(result.every((r) => r.excludedByMinimum)).toBe(true)
-    expect(result.every((r) => r.allocatedMinutes === 0)).toBe(true)
+  it(`1日の割当件数は最大${MAX_ASSIGNMENTS_PER_DAY}件までで、capacityが余っても打ち切られる`, () => {
+    const inputs = Array.from({ length: MAX_ASSIGNMENTS_PER_DAY + 2 }, (_, i) => ({
+      assignmentId: `item-${i}`,
+      score: 100 - i, // スコアはitem-0が最高
+      remainingMinutes: BLOCK_MINUTES, // ちょうどBLOCK_MINUTES分ずつ
+      isUrgent: false,
+    }))
+
+    const result = allocateCapacity(1000, inputs)
+    const assignedCount = result.filter((r) => !r.excludedByMinimum).length
+
+    expect(assignedCount).toBe(MAX_ASSIGNMENTS_PER_DAY)
+    // 上限に達した後の宿題は、capacityが余っていてもスキップされる
+    const overflowItems = result.filter(
+      (r) => Number(r.assignmentId.split('-')[1]) >= MAX_ASSIGNMENTS_PER_DAY,
+    )
+    expect(overflowItems.every((r) => r.excludedByMinimum)).toBe(true)
   })
 
   it('スコアが0以下の宿題は最初から除外される', () => {
     const result = allocateCapacity(50, [
-      { assignmentId: 'a', score: 10 },
-      { assignmentId: 'zero', score: 0 },
+      { assignmentId: 'a', score: 10, remainingMinutes: 100, isUrgent: false },
+      { assignmentId: 'zero', score: 0, remainingMinutes: 100, isUrgent: false },
     ])
     const zero = result.find((r) => r.assignmentId === 'zero')!
     expect(zero.excludedByMinimum).toBe(true)
@@ -82,8 +89,8 @@ describe('allocateCapacity', () => {
 
   it('capacityが0の場合は全員除外扱いになる', () => {
     const result = allocateCapacity(0, [
-      { assignmentId: 'a', score: 10 },
-      { assignmentId: 'b', score: 20 },
+      { assignmentId: 'a', score: 10, remainingMinutes: 100, isUrgent: false },
+      { assignmentId: 'b', score: 20, remainingMinutes: 100, isUrgent: false },
     ])
     expect(result.every((r) => r.allocatedMinutes === 0)).toBe(true)
     expect(result.every((r) => r.excludedByMinimum)).toBe(true)
@@ -93,31 +100,25 @@ describe('allocateCapacity', () => {
     expect(allocateCapacity(100, [])).toEqual([])
   })
 
-  it('連鎖的な下限除外: 除外後の再按分でさらに下限未満が発生するケース', () => {
-    // capacity=30、4件。1回目の按分で一部が下限未満になり除外、
-    // 再按分後にさらに別の1件が下限未満になるシナリオ
-    const result = allocateCapacity(30, [
-      { assignmentId: 'a', score: 1 },
-      { assignmentId: 'b', score: 2 },
-      { assignmentId: 'c', score: 3 },
-      { assignmentId: 'd', score: 94 },
+  it('残り時間がBLOCK_MINUTES未満の宿題が複数連続しても、緊急でなければ全てスキップされ次の宿題に回る', () => {
+    const result = allocateCapacity(50, [
+      { assignmentId: 'small1', score: 100, remainingMinutes: 10, isUrgent: false },
+      { assignmentId: 'small2', score: 90, remainingMinutes: 15, isUrgent: false },
+      { assignmentId: 'big', score: 80, remainingMinutes: 200, isUrgent: false },
     ])
-    const total = result.reduce((sum, r) => sum + r.allocatedMinutes, 0)
-    expect(total).toBeCloseTo(30)
-    // 全ての非除外項目が下限時間以上であることを確認
-    for (const r of result) {
-      if (!r.excludedByMinimum) {
-        expect(r.allocatedMinutes).toBeGreaterThanOrEqual(5 - 1e-9)
-      } else {
-        expect(r.allocatedMinutes).toBe(0)
-      }
-    }
+    const small1 = result.find((r) => r.assignmentId === 'small1')!
+    const small2 = result.find((r) => r.assignmentId === 'small2')!
+    const big = result.find((r) => r.assignmentId === 'big')!
+
+    expect(small1.excludedByMinimum).toBe(true)
+    expect(small2.excludedByMinimum).toBe(true)
+    expect(big.allocatedMinutes).toBeCloseTo(50)
   })
 
-  it('全宿題が下限時間未満になる場合、全員除外される', () => {
-    const result = allocateCapacity(3, [
-      { assignmentId: 'a', score: 1 },
-      { assignmentId: 'b', score: 1 },
+  it('全宿題の残り時間がBLOCK_MINUTES未満かつ非緊急なら、全員除外される', () => {
+    const result = allocateCapacity(100, [
+      { assignmentId: 'a', score: 1, remainingMinutes: 10, isUrgent: false },
+      { assignmentId: 'b', score: 1, remainingMinutes: 10, isUrgent: false },
     ])
     expect(result.every((r) => r.excludedByMinimum)).toBe(true)
     expect(result.every((r) => r.allocatedMinutes === 0)).toBe(true)
