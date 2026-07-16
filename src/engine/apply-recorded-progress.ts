@@ -14,6 +14,7 @@
  */
 
 import type { Assignment } from '../domain'
+import { getTotalRequiredItems } from '../domain/assignment'
 
 export interface RecordedProgressInput {
   /** 記録された「進んだ量」。page: ページ数、repetition: 項目数、creative/project: 工程進捗比率の増分 */
@@ -43,14 +44,13 @@ export function applyRecordedProgress(
       }
     }
     case 'repetition': {
-      const nextCompletedItems = Math.min(
-        assignment.totalItems,
-        assignment.completedItems + amount,
-      )
+      // 周回込みの総必要量（totalItems × cycleCount）を上限とする
+      const totalRequired = getTotalRequiredItems(assignment)
+      const nextCompletedItems = Math.min(totalRequired, assignment.completedItems + amount)
       return {
         ...assignment,
         completedItems: nextCompletedItems,
-        isCompleted: nextCompletedItems >= assignment.totalItems,
+        isCompleted: nextCompletedItems >= totalRequired,
       }
     }
     case 'creative':
