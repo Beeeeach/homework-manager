@@ -7,6 +7,7 @@
 import type { Assignment, UserSettings } from '../domain'
 import { getHomeScreenData } from '../engine/home-screen-data'
 import type { TodayTaskView } from '../engine/home-screen-data'
+import { advanceAssignments } from '../engine/apply-virtual-progress'
 
 interface UpcomingViewProps {
   /** 基準日（今日）。この翌日から表示する */
@@ -48,13 +49,23 @@ export function UpcomingView({ date, assignments, settings }: UpcomingViewProps)
   const horizonDays = getMaxHorizonDays(date, assignments)
 
   const days: DayView[] = []
+  // 日をまたいで進捗を引き継ぐため、ループの中で使うassignmentsを都度更新していく。
+  // これをしないと、同じ宿題の残り時間が締切までの全日程に重複して配分されてしまう。
+  let workingAssignments = assignments
   for (let i = 1; i <= horizonDays; i++) {
     const targetDate = addDays(date, i)
-    const data = getHomeScreenData(targetDate, assignments, settings)
+    const data = getHomeScreenData(targetDate, workingAssignments, settings)
     // タスクがある日だけ表示する（宿題がない日を延々と並べても意味がないため）
     if (data.todayTasks.length > 0) {
       days.push({ date: targetDate, tasks: data.todayTasks })
     }
+    workingAssignments = advanceAssignments(
+      workingAssignments,
+      data.todayTasks.map((t) => ({
+        assignmentId: t.assignmentId,
+        allocatedMinutes: t.plannedMinutes,
+      })),
+    )
   }
 
   return (
