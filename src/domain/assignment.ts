@@ -24,13 +24,20 @@ interface AssignmentBase {
   isCompleted: boolean
 }
 
-/** ① ページ型（数学ワーク、英語ワークなど） */
+/**
+ * ① ページ型（数学ワーク、英語ワークなど）
+ * 宿題によって数える単位が「ページ」「章」「問題番号」などさまざまなため、
+ * unitLabel で表示ラベルをカスタマイズできるようにする（省略時は「ページ」）。
+ * totalPages/currentPage の意味自体は変わらず、あくまで表示上のラベルの違い。
+ */
 export interface PageAssignment extends AssignmentBase {
   type: 'page'
   totalPages: number
   currentPage: number
   /** 1ページ当たりの予想時間（分）。初期値はユーザー選択、後にEMAで更新される */
   estimatedMinutesPerPage: number
+  /** 数える単位の表示ラベル（例:「ページ」「章」「問」「回」）。省略時は「ページ」として扱う */
+  unitLabel?: string
 }
 
 /** ② 反復型（英単語、漢字、古文単語など） */
@@ -83,3 +90,8 @@ export type Assignment =
   | RepetitionAssignment
   | CreativeAssignment
   | ProjectAssignment
+
+/** PageAssignmentの表示用単位ラベルを取得する（unitLabel省略時は「ページ」） */
+export function getPageUnitLabel(assignment: PageAssignment): string {
+  return assignment.unitLabel?.trim() || 'ページ'
+}
