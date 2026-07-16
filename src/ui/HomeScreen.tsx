@@ -17,6 +17,28 @@ interface HomeScreenProps {
   settings: UserSettings
 }
 
+/** 宿題タイプごとの、記録画面に表示する単位ラベル */
+function getUnitLabel(assignment: Assignment | undefined): string {
+  if (!assignment) return '単位'
+  switch (assignment.type) {
+    case 'page':
+      return 'ページ'
+    case 'repetition':
+      return '個'
+    case 'creative':
+    case 'project':
+      return '進捗（0〜1の割合）'
+  }
+}
+
+/** 創作型・プロジェクト型の場合、進捗を反映する対象工程（未完了の最初の工程）のIDを返す */
+function getActivePhaseId(assignment: Assignment | undefined): string | undefined {
+  if (!assignment) return undefined
+  if (assignment.type !== 'creative' && assignment.type !== 'project') return undefined
+  const activePhase = assignment.phases.find((p) => !p.isCompleted)
+  return activePhase?.id
+}
+
 export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
   const data = getHomeScreenData(date, assignments, settings)
   const [started, setStarted] = useState(false)
@@ -80,39 +102,43 @@ export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
               今日やる宿題はありません。
             </p>
           )}
-          {displayTasks.map((task, index) => (
-            <div key={task.assignmentId} className="space-y-2">
-              <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
-                <span>
-                  {task.subject} ・ 予定{Math.round(task.plannedMinutes)}分
-                </span>
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => moveTask(index, -1)}
-                    className="rounded bg-white px-2 py-0.5"
-                    aria-label="上に移動"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveTask(index, 1)}
-                    className="rounded bg-white px-2 py-0.5"
-                    aria-label="下に移動"
-                  >
-                    ↓
-                  </button>
+          {displayTasks.map((task, index) => {
+            const assignment = assignments.find((a) => a.id === task.assignmentId)
+            return (
+              <div key={task.assignmentId} className="space-y-2">
+                <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
+                  <span>
+                    {task.subject} ・ 予定{Math.round(task.plannedMinutes)}分
+                  </span>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => moveTask(index, -1)}
+                      className="rounded bg-white px-2 py-0.5"
+                      aria-label="上に移動"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveTask(index, 1)}
+                      className="rounded bg-white px-2 py-0.5"
+                      aria-label="下に移動"
+                    >
+                      ↓
+                    </button>
+                  </div>
                 </div>
+                <RecordPanel
+                  taskId={task.assignmentId}
+                  assignmentId={task.assignmentId}
+                  taskTitle={task.title}
+                  unitLabel={getUnitLabel(assignment)}
+                  phaseId={getActivePhaseId(assignment)}
+                />
               </div>
-              <RecordPanel
-                taskId={task.assignmentId}
-                assignmentId={task.assignmentId}
-                taskTitle={task.title}
-                unitLabel="単位"
-              />
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
