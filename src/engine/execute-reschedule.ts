@@ -4,6 +4,13 @@
  *
  * decideRescheduleRangeで決定した対象日について、scheduleForDay（10.2①〜③）を
  * 再実行し、AllocationLog生成に必要な情報も含めて返す。
+ *
+ * 【日をまたぐ進捗の扱い】
+ * 複数日分をまとめて予測するため、ある日に配分された分（allocatedMinutes）は
+ * 翌日の計算に進む前に、仮想的にAssignmentの進捗として反映する
+ * （advanceAssignments）。これをしないと、同じ残り時間が日をまたいで
+ * 重複配分されてしまう。これはあくまで予測用の仮想進捗であり、
+ * 実際のAssignmentデータやユーザーの学習記録は変更しない。
  */
 
 import type { Assignment, DateString, UserSettings, AllocationTrigger } from '../domain'
@@ -11,6 +18,7 @@ import { scheduleForDay } from './schedule-day'
 import type { DayScheduleResult } from './schedule-day'
 import { decideRescheduleRange } from './reschedule'
 import type { RescheduleLevel } from './reschedule'
+import { advanceAssignments } from './apply-virtual-progress'
 
 export interface RescheduleResult {
   level: RescheduleLevel
@@ -42,9 +50,16 @@ export function executeReschedule(
 ): RescheduleResult {
   const decision = decideRescheduleRange(assignments, currentDate, settings)
 
-  const daySchedules = decision.targetDates.map((date) =>
-    scheduleForDay(date, assignments, settings),
-  )
+  // 日をまたいで進捗を引き継ぐため、mapではなくforループで
+  // 「その日の計算に使うAssignment一覧」を毎回更新しながら進める
+  let workingAssignments = assignments
+  const daySchedules: DayScheduleResult[] = []
+
+  for (const date of decision.targetDates) {
+    const daySchedule = scheduleForDay(date, workingAssignments, settings)
+    daySchedules.push(daySchedule)
+    workingAssignments = advanceAssignments(workingAssignments, daySchedule.allocations)
+  }
 
   return {
     level: decision.level,
