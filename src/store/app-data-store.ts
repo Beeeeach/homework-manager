@@ -14,7 +14,11 @@ interface AppDataState {
   isSetupComplete: boolean
 
   setSettings: (settings: UserSettings) => void
+  /** 設定完了後に、期間・勉強可能時間などを後から変更する */
+  updateSettings: (settings: UserSettings) => void
   addAssignment: (assignment: Assignment) => void
+  /** 宿題を削除する（即削除、確認はUI側の責務） */
+  deleteAssignment: (assignmentId: Id) => void
   completeSetup: () => void
   /** 全データを初期状態に戻す（設定・宿題・完了フラグすべてリセット） */
   resetAll: () => void
@@ -32,8 +36,13 @@ export const useAppDataStore = create<AppDataState>((set) => ({
   isSetupComplete: false,
 
   setSettings: (settings) => set({ settings }),
+  updateSettings: (settings) => set({ settings }),
   addAssignment: (assignment) =>
     set((state) => ({ assignments: [...state.assignments, assignment] })),
+  deleteAssignment: (assignmentId) =>
+    set((state) => ({
+      assignments: state.assignments.filter((a) => a.id !== assignmentId),
+    })),
   completeSetup: () => set({ isSetupComplete: true }),
   resetAll: () =>
     set({
