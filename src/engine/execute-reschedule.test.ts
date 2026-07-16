@@ -42,11 +42,13 @@ describe('executeReschedule', () => {
         sum + day.allocations.reduce((s, a) => s + a.allocatedMinutes, 0),
       0,
     )
-    // capacityが十分にあるので、初日にすべて50分が割り当てられ、残り2日は0になるはず
-    // (allocateCapacityは「その日のcapacity」を按分するので、宿題1件だけなら全capacityを使い切ってしまう点に注意)
-    // ここでは合計が「日毎のcapacity合計」と一致することを確認する
+    // 集中配分方式では、宿題の残り時間（50分）を超えて配分されることはない。
+    // 初日にまとめて50分配分され、以降の日は残り時間0のため配分されない。
+    expect(totalAllocated).toBeCloseTo(50)
+
     const totalCapacity = result.daySchedules.reduce((s, d) => s + d.capacityMinutes, 0)
-    expect(totalAllocated).toBeCloseTo(totalCapacity)
+    // 宿題の残り時間はcapacity合計を超えない（余ったcapacityは使われず捨てられる）
+    expect(totalAllocated).toBeLessThanOrEqual(totalCapacity)
   })
 
   it('level3の場合、休暇全期間のスケジュールが生成される', () => {
