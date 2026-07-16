@@ -87,7 +87,7 @@ describe('scheduleForDay（統合）', () => {
     expect(result.allocations[0].allocatedMinutes).toBe(0)
   })
 
-  it('異なるタイプの宿題が混在する場合、優先度の高い方から順に配分され、合計はcapacityを超えない', () => {
+  it('異なるタイプの宿題が混在する場合、それぞれの計算方式で正しく配分される', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
@@ -95,19 +95,86 @@ describe('scheduleForDay（統合）', () => {
       id: 'page',
       totalPages: 10,
       currentPage: 0,
-      estimatedMinutesPerPage: 5, // 残り50分
+      estimatedMinutesPerPage: 5, // 残り50分（集中配分の対象）
       deadline: '2026-07-25',
     })
+    // repetition型は頻度未指定（デフォルト: 毎日・1周）のため、
+    // 「今日1日で終わらせる」のではなく「締切までの日数で均等ペース」の固定枠として扱われる。
+    // 総必要量100個、残り日数6日（7/20〜7/25、当日含む）→ 1日あたり 100/6 ≈ 16.67個 × 0.5分 ≈ 8.33分
     const repType = makeRepetitionAssignment({
       id: 'rep',
       totalItems: 100,
       completedItems: 0,
-      estimatedMinutesPerItem: 0.5, // 残り50分
+      estimatedMinutesPerItem: 0.5,
       deadline: '2026-07-25',
     })
     const result = scheduleForDay('2026-07-20', [pageType, repType], settings)
+
+    const pageAlloc = result.allocations.find((a) => a.assignmentId === 'page')!
+    const repAlloc = result.allocations.find((a) => a.assignmentId === 'rep')!
+
+    // pageは集中配分により残り時間50分をまるごと得る
+    expect(pageAlloc.allocatedMinutes).toBeCloseTo(50)
+    // repは頻度計算による固定枠（約8.33分）
+    expect(repAlloc.allocatedMinutes).toBeCloseTo((100 / 6) * 0.5)
+
     const total = result.allocations.reduce((s, a) => s + a.allocatedMinutes, 0)
-    // 両方とも残り時間50分ずつなので、2件合計で100分（capacityちょうど）配分される
-    expect(total).toBeCloseTo(100)
+    // 合計はcapacity（100分）を超えない
+    expect(total).toBeLessThanOrEqual(100)
+  })
+
+  it('頻度指定つき反復型は、実施日でなければ完全に除外され、他の宿題にcapacityが回る', () => {
+    const settings = makeUserSettings({
+      weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
+    })
+    // frequencyDays=2、createdAt=7/20 なので、7/21（1日後）は実施日ではない
+    const rep = makeRepetitionAssignment({
+      id: 'rep',
+      createdAt: '2026-07-20',
+      frequencyDays: 2,
+      totalItems: 100,
+      estimatedMinutesPerItem: 0.5,
+      deadline: '2026-08-31',
+    })
+    const page = makePageAssignment({
+      id: 'page',
+      totalPages: 10,
+      currentPage: 0,
+      estimatedMinutesPerPage: 5, // 残り50分
+      deadline: '2026-08-31',
+    })
+    const result = scheduleForDay('2026-07-21', [rep, page], settings)
+
+    // repは実施日でないため配分なし・除外扱い
+    const repAlloc = result.allocations.find((a) => a.assignmentId === 'rep')!
+    expect(repAlloc.allocatedMinutes).toBe(0)
+    expect(repAlloc.excludedByMinimum).toBe(true)
+
+    // capacityがrepに使われない分、pageが通常通り配分される
+    const pageAlloc = result.allocations.find((a) => a.assignmentId === 'page')!
+    expect(pageAlloc.allocatedMinutes).toBeCloseTo(50)
+  })
+
+  it('頻度指定つき反復型は、実施日なら固定枠として先に確保され、集中配分の対象から独立する', () => {
+    const settings = makeUserSettings({
+      weekdayStudyMinutes: { 0: 20, 1: 20, 2: 20, 3: 20, 4: 20, 5: 20, 6: 20 },
+    })
+    // 20日間で1000単語を毎日3周 → 総必要量3000、20日間で1日150個 × 0.5分 = 75分
+    // だがcapacityは20分しかないため、固定枠はcapacity上限（20分）でクリップされる
+    const rep = makeRepetitionAssignment({
+      id: 'rep',
+      createdAt: '2026-07-20',
+      deadline: '2026-08-08',
+      totalItems: 1000,
+      cycleCount: 3,
+      frequencyDays: 1,
+      estimatedMinutesPerItem: 0.5,
+    })
+    const result = scheduleForDay('2026-07-20', [rep], settings)
+
+    const repAlloc = result.allocations.find((a) => a.assignmentId === 'rep')!
+    // capacity上限でクリップされ、20分がまるごと確保される
+    expect(repAlloc.allocatedMinutes).toBeCloseTo(20)
+    expect(repAlloc.excludedByMinimum).toBe(false)
   })
 })
