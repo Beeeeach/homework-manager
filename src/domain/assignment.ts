@@ -40,13 +40,44 @@ export interface PageAssignment extends AssignmentBase {
   unitLabel?: string
 }
 
-/** ② 反復型（英単語、漢字、古文単語など） */
+/**
+ * ② 反復型（英単語、漢字、古文単語など）
+ *
+ * 「何周したいか」「どのくらいの頻度で行うか」を指定できるようにした。
+ * 例: 20日間の休みで1000単語を3周したい、毎日やる場合
+ *   → totalItems=1000, cycleCount=3, frequencyDays=1
+ *   → 総必要量は1000×3=3000（周をまたいで積み上げる量）
+ *   → completedItemsは「これまでに実施した累積量」を表す（1周分の中の進捗ではない）
+ *
+ * cycleCount・frequencyDaysは省略可能（省略時は1＝「1周だけ・毎日」相当）とし、
+ * 既存データ（この機能追加前に登録されたAssignment）との後方互換を保つ。
+ */
 export interface RepetitionAssignment extends AssignmentBase {
   type: 'repetition'
   totalItems: number
+  /** これまでに実施した累積量（周をまたいで積み上がる。totalItems×cycleCountが上限） */
   completedItems: number
   /** 項目1つ当たりの予想時間（分） */
   estimatedMinutesPerItem: number
+  /** 何周したいか。省略時は1（1周のみ） */
+  cycleCount?: number
+  /** N日に1回のペースで行うか。省略時は1（毎日） */
+  frequencyDays?: number
+}
+
+/** RepetitionAssignmentのcycleCountを取得する（省略時は1） */
+export function getCycleCount(assignment: RepetitionAssignment): number {
+  return assignment.cycleCount ?? 1
+}
+
+/** RepetitionAssignmentのfrequencyDaysを取得する（省略時は1＝毎日） */
+export function getFrequencyDays(assignment: RepetitionAssignment): number {
+  return assignment.frequencyDays ?? 1
+}
+
+/** RepetitionAssignmentの「総必要量」（周回込みの総量）を取得する */
+export function getTotalRequiredItems(assignment: RepetitionAssignment): number {
+  return assignment.totalItems * getCycleCount(assignment)
 }
 
 /** 創作型・プロジェクト型に共通する「工程」 */
