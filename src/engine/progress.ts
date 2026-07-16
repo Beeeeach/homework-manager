@@ -5,6 +5,7 @@
 
 import type { Assignment } from '../domain'
 import { getRemainingMinutes } from './remaining-time'
+import { getTotalRequiredItems } from '../domain/assignment'
 
 /** Assignmentの「初期時点での推定合計時間（分）」。進捗率の分母として使う */
 export function getEstimatedTotalMinutesForAssignment(assignment: Assignment): number {
@@ -12,7 +13,8 @@ export function getEstimatedTotalMinutesForAssignment(assignment: Assignment): n
     case 'page':
       return assignment.totalPages * assignment.estimatedMinutesPerPage
     case 'repetition':
-      return assignment.totalItems * assignment.estimatedMinutesPerItem
+      // 周回込みの総必要量（totalItems × cycleCount）を分母とする
+      return getTotalRequiredItems(assignment) * assignment.estimatedMinutesPerItem
     case 'creative':
     case 'project':
       return assignment.estimatedTotalMinutes
