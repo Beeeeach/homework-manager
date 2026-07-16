@@ -10,6 +10,7 @@ import type { Assignment, UserSettings } from '../domain'
 import { getHomeScreenData } from '../engine/home-screen-data'
 import type { TodayTaskView } from '../engine/home-screen-data'
 import { RecordPanel } from './RecordPanel'
+import { getPageUnitLabel } from '../domain/assignment'
 
 interface HomeScreenProps {
   date: string
@@ -22,7 +23,8 @@ function getUnitLabel(assignment: Assignment | undefined): string {
   if (!assignment) return '単位'
   switch (assignment.type) {
     case 'page':
-      return 'ページ'
+      // 宿題ごとにカスタマイズされた単位（例:「章」「問」）を使う。未指定なら「ページ」
+      return getPageUnitLabel(assignment)
     case 'repetition':
       return '個'
     case 'creative':
