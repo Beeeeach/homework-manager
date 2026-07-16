@@ -1,11 +1,12 @@
 /**
  * 全宿題の進捗状況確認ビュー。
- * 宿題ごとに進捗率（progress.ts）と締切までの残日数を一覧表示する。
+ * 宿題ごとに進捗率（progress.ts）と締切までの残日数、残り予想時間を一覧表示する。
  */
 
 import type { Assignment } from '../domain'
 import type { HomeworkType } from '../config/constants'
 import { getProgressRatio, getDaysUntilDeadline } from '../engine/progress'
+import { getRemainingMinutes } from '../engine/remaining-time'
 
 interface ProgressViewProps {
   date: string
@@ -27,6 +28,17 @@ function DeadlineLabel({ days }: { days: number }) {
     return <span className="text-amber-600">今日が締切</span>
   }
   return <span className="text-slate-400">残り{days}日</span>
+}
+
+/** 残り予想時間を「〇時間〇分」または「〇分」の読みやすい形式にする */
+function formatRemainingMinutes(minutes: number): string {
+  const rounded = Math.round(minutes)
+  if (rounded <= 0) return '0分'
+  const hours = Math.floor(rounded / 60)
+  const mins = rounded % 60
+  if (hours === 0) return `${mins}分`
+  if (mins === 0) return `${hours}時間`
+  return `${hours}時間${mins}分`
 }
 
 export function ProgressView({ date, assignments }: ProgressViewProps) {
@@ -51,6 +63,7 @@ export function ProgressView({ date, assignments }: ProgressViewProps) {
         const progress = getProgressRatio(assignment)
         const daysLeft = getDaysUntilDeadline(assignment.deadline, date)
         const percent = Math.round(progress * 100)
+        const remainingMinutes = getRemainingMinutes(assignment)
 
         return (
           <div
@@ -78,8 +91,10 @@ export function ProgressView({ date, assignments }: ProgressViewProps) {
               </div>
               <div className="mt-1 flex justify-between text-xs text-slate-400">
                 <span>{percent}%完了</span>
-                {assignment.isCompleted && (
+                {assignment.isCompleted ? (
                   <span className="text-emerald-600">完了済み</span>
+                ) : (
+                  <span>残り予想時間: {formatRemainingMinutes(remainingMinutes)}</span>
                 )}
               </div>
             </div>
