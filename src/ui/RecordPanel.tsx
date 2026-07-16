@@ -2,10 +2,15 @@
  * 記録機能（仕様書 13章）のUI。
  * ストップウォッチ方式を基本とし、手入力にも対応する。
  * 途中終了でも保存される。
+ *
+ * 記録と同時に、Assignment本体の進捗（currentPage等）にも反映する（recordProgress）。
+ * これをしないと、記録は学習履歴として残るだけで、進捗表示や翌日以降の
+ * スケジュールに一切反映されないというバグになる。
  */
 
 import { useEffect, useState } from 'react'
 import { useStudySessionStore } from '../store/study-session-store'
+import { useAppDataStore } from '../store/app-data-store'
 import type { Id } from '../domain'
 
 interface RecordPanelProps {
@@ -14,6 +19,8 @@ interface RecordPanelProps {
   taskTitle: string
   /** 単位のラベル（例: "ページ", "個", "%"） */
   unitLabel: string
+  /** 創作型・プロジェクト型の場合、進捗を反映する対象工程のID。ページ型・反復型では不要 */
+  phaseId?: Id
   onRecorded?: () => void
 }
 
@@ -29,12 +36,14 @@ export function RecordPanel({
   assignmentId,
   taskTitle,
   unitLabel,
+  phaseId,
   onRecorded,
 }: RecordPanelProps) {
   const running = useStudySessionStore((s) => s.running)
   const startStopwatch = useStudySessionStore((s) => s.startStopwatch)
   const stopStopwatch = useStudySessionStore((s) => s.stopStopwatch)
   const addManualSession = useStudySessionStore((s) => s.addManualSession)
+  const recordProgress = useAppDataStore((s) => s.recordProgress)
 
   const [elapsedMs, setElapsedMs] = useState(0)
   const [mode, setMode] = useState<'stopwatch' | 'manual'>('stopwatch')
@@ -60,6 +69,7 @@ export function RecordPanel({
     const amount = Number(amountInput)
     if (!Number.isFinite(amount) || amount < 0) return
     stopStopwatch(amount)
+    recordProgress(assignmentId, { amount, phaseId })
     setAmountInput('')
     onRecorded?.()
   }
@@ -70,6 +80,7 @@ export function RecordPanel({
     if (!Number.isFinite(amount) || amount < 0) return
     if (!Number.isFinite(minutes) || minutes <= 0) return
     addManualSession({ taskId, assignmentId, actualAmount: amount, actualMinutes: minutes })
+    recordProgress(assignmentId, { amount, phaseId })
     setAmountInput('')
     setManualMinutes('')
     onRecorded?.()
