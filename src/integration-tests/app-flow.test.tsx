@@ -19,13 +19,15 @@ describe('結合テスト(UI): 初回設定 → 宿題登録 → ホーム画面
       expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument()
     })
 
-    // ステップ①〜④: 「次へ」を3回押して④まで進み、最後に「宿題の登録へ」を押す
+    // ステップ①〜④: 「次へ」を4回押して⑤（締切バッファ設定）まで進む
     fireEvent.click(screen.getByText('次へ')) // ①→②
     fireEvent.click(screen.getByText('次へ')) // ②→③
     fireEvent.click(screen.getByText('次へ')) // ③→④
+    fireEvent.click(screen.getByText('次へ')) // ④→⑤
+    // ⑤ 締切バッファ設定はデフォルト値のまま「宿題の登録へ」を押す
     fireEvent.click(screen.getByText('宿題の登録へ'))
 
-    // ⑤ 宿題登録フォームが表示される
+    // ⑥ 宿題登録フォームが表示される
     expect(await screen.findByText('⑤ 宿題を登録する')).toBeInTheDocument()
 
     // タイトルと教科を入力して登録
