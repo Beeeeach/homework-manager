@@ -145,10 +145,9 @@ describe('scheduleForDay（統合）', () => {
     })
     const result = scheduleForDay('2026-07-21', [rep, page], settings)
 
-    // repは実施日でないため配分なし・除外扱い
-    const repAlloc = result.allocations.find((a) => a.assignmentId === 'rep')!
-    expect(repAlloc.allocatedMinutes).toBe(0)
-    expect(repAlloc.excludedByMinimum).toBe(true)
+    // repは実施日でないため、そもそも対象から完全に除外され、allocations配列に登場しない
+    const repAlloc = result.allocations.find((a) => a.assignmentId === 'rep')
+    expect(repAlloc).toBeUndefined()
 
     // capacityがrepに使われない分、pageが通常通り配分される
     const pageAlloc = result.allocations.find((a) => a.assignmentId === 'page')!
