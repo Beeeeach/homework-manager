@@ -73,6 +73,8 @@ export function AssignmentForm({
   // 反復型
   const [totalItems, setTotalItems] = useState('100')
   const [minutesPerItem, setMinutesPerItem] = useState('0.5')
+  const [cycleCount, setCycleCount] = useState('1')
+  const [frequencyDays, setFrequencyDays] = useState('1')
 
   // 創作型
   const [targetCharCount, setTargetCharCount] = useState('1200')
@@ -106,6 +108,8 @@ export function AssignmentForm({
         totalItems: Number(totalItems),
         completedItems: 0,
         estimatedMinutesPerItem: Number(minutesPerItem),
+        cycleCount: Number(cycleCount) || 1,
+        frequencyDays: Number(frequencyDays) || 1,
       }
     }
     if (type === 'creative') {
@@ -257,26 +261,54 @@ export function AssignmentForm({
       )}
 
       {type === 'repetition' && (
-        <div className="mt-2 flex gap-2">
-          <label className="flex-1 text-xs text-slate-500">
-            総単語数
-            <input
-              type="number"
-              value={totalItems}
-              onChange={(e) => setTotalItems(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-            />
-          </label>
-          <label className="flex-1 text-xs text-slate-500">
-            1個あたり時間（分）
-            <input
-              type="number"
-              step="0.1"
-              value={minutesPerItem}
-              onChange={(e) => setMinutesPerItem(e.target.value)}
-              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-            />
-          </label>
+        <div className="mt-2 space-y-2">
+          <div className="flex gap-2">
+            <label className="flex-1 text-xs text-slate-500">
+              総単語数（1周分）
+              <input
+                type="number"
+                value={totalItems}
+                onChange={(e) => setTotalItems(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex-1 text-xs text-slate-500">
+              1個あたり時間（分）
+              <input
+                type="number"
+                step="0.1"
+                value={minutesPerItem}
+                onChange={(e) => setMinutesPerItem(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <label className="flex-1 text-xs text-slate-500">
+              何周したいか
+              <input
+                type="number"
+                min="1"
+                value={cycleCount}
+                onChange={(e) => setCycleCount(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <label className="flex-1 text-xs text-slate-500">
+              何日に1回やるか
+              <input
+                type="number"
+                min="1"
+                value={frequencyDays}
+                onChange={(e) => setFrequencyDays(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+          </div>
+          <p className="text-xs text-slate-400">
+            例: 1000単語を毎日（1日に1回）3周したい場合 →
+            総単語数1000・何周3・何日に1回1 として登録すると、休みの期間から自動で1日あたりの量が計算されます。
+          </p>
         </div>
       )}
 
