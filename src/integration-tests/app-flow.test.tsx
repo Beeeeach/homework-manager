@@ -38,11 +38,12 @@ describe('結合テスト(UI): 初回設定 → 宿題登録 → ホーム画面
     fireEvent.click(screen.getByText('この宿題を追加'))
 
     // 登録済みリストに反映される（「・」と本文が別テキストノードに分かれるため、
-    // 要素のtextContent全体で判定する関数マッチャーを使う）
+    // 該当のspan要素のtextContentで判定する。祖先要素まで拾わないようtagNameで絞る）
     expect(
-      await screen.findByText((_, element) =>
-        Boolean(element?.textContent?.includes('数学ワーク（ページ管理')),
-      ),
+      await screen.findByText((_, element) => {
+        if (element?.tagName.toLowerCase() !== 'span') return false
+        return Boolean(element.textContent?.includes('数学ワーク（ページ管理'))
+      }),
     ).toBeInTheDocument()
 
     // 登録を終えてホーム画面へ
