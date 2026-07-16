@@ -1,6 +1,10 @@
 /**
  * 初回設定ウィザード（仕様書 6章 ①〜④、および締切バッファ設定を追加）
  * 目標時間3分以内で完了できることを意識し、入力項目を最小限に絞る。
+ *
+ * 変更点:
+ *   - ②曜日ごとの勉強可能時間に「全曜日へ一括適用」入力欄を追加
+ *   - ③固定予定に「平日」「週末」ワンタップ追加ボタンを追加
  */
 
 import { useState } from 'react'
@@ -25,6 +29,8 @@ const WEEKDAY_LABELS: Record<Weekday, string> = {
 }
 
 const WEEKDAY_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0]
+const WEEKDAYS_ONLY: Weekday[] = [1, 2, 3, 4, 5]
+const WEEKEND_ONLY: Weekday[] = [6, 0]
 
 interface SetupWizardProps {
   onComplete: (settings: UserSettings) => void
@@ -45,6 +51,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     5: 60,
     6: 60,
   })
+  const [bulkMinutes, setBulkMinutes] = useState('60')
 
   const [recurringSchedules, setRecurringSchedules] = useState<RecurringSchedule[]>([])
   const [specialSchedules, setSpecialSchedules] = useState<SpecialSchedule[]>([])
@@ -52,10 +59,30 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     DEFAULT_DEADLINE_BUFFER,
   )
 
+  function applyBulkMinutes() {
+    const value = Number(bulkMinutes)
+    if (!Number.isFinite(value) || value < 0) return
+    setWeekdayMinutes({ 0: value, 1: value, 2: value, 3: value, 4: value, 5: value, 6: value })
+  }
+
   function addRecurring() {
     setRecurringSchedules((prev) => [
       ...prev,
       { id: crypto.randomUUID(), title: '', weekday: 1, durationMinutes: 60 },
+    ])
+  }
+
+  /** 平日（月〜金）または週末（土日）ぶんの固定予定を、同じ名称・時間で一括追加する */
+  function addRecurringForGroup(weekdays: Weekday[]) {
+    const title = weekdays === WEEKDAYS_ONLY ? '固定予定（平日）' : '固定予定（週末）'
+    setRecurringSchedules((prev) => [
+      ...prev,
+      ...weekdays.map((wd) => ({
+        id: crypto.randomUUID(),
+        title,
+        weekday: wd,
+        durationMinutes: 60,
+      })),
     ])
   }
 
@@ -151,6 +178,26 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       {step === 2 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-700">② 曜日ごとの勉強可能時間</h2>
+
+          <div className="mt-3 flex items-end gap-2 rounded-md bg-slate-50 p-2">
+            <label className="flex-1 text-xs text-slate-500">
+              全曜日に一括で適用
+              <input
+                type="number"
+                value={bulkMinutes}
+                onChange={(e) => setBulkMinutes(e.target.value)}
+                className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={applyBulkMinutes}
+              className="rounded-md bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700"
+            >
+              一括適用
+            </button>
+          </div>
+
           <div className="mt-3 space-y-2">
             {WEEKDAY_ORDER.map((wd) => (
               <div key={wd} className="flex items-center gap-2">
@@ -192,6 +239,24 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       {step === 3 && (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-sm font-semibold text-slate-700">③ 固定予定（部活・塾など）</h2>
+
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => addRecurringForGroup(WEEKDAYS_ONLY)}
+              className="flex-1 rounded-md bg-slate-100 py-2 text-xs font-medium text-slate-700"
+            >
+              + 平日（月〜金）に追加
+            </button>
+            <button
+              type="button"
+              onClick={() => addRecurringForGroup(WEEKEND_ONLY)}
+              className="flex-1 rounded-md bg-slate-100 py-2 text-xs font-medium text-slate-700"
+            >
+              + 週末（土日）に追加
+            </button>
+          </div>
+
           <div className="mt-3 space-y-3">
             {recurringSchedules.map((r) => (
               <div key={r.id} className="flex items-center gap-2">
@@ -237,7 +302,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               onClick={addRecurring}
               className="text-xs font-medium text-indigo-600"
             >
-              + 固定予定を追加
+              + 固定予定を1件追加
             </button>
           </div>
           <div className="mt-4 flex gap-2">
