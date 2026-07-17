@@ -15,8 +15,11 @@ import { hydrateFromRepository, persistToRepository } from './data/persistence-c
 import type { LearningRecordStore } from './engine/learning-store'
 import type { AppRepository } from './data/repository'
 import { useAuth } from './auth/use-auth'
+import { getTodayDateString } from './engine/date-utils'
 
-const TODAY = '2026-07-20'
+// 実際の「今日」の日付（ブラウザのローカル時刻）を使う。
+// 日付をまたいで開いた場合も、コンポーネントが再描画されるたびに最新の値が使われる。
+const TODAY = getTodayDateString()
 const localRepository = createLocalStorageRepository()
 
 type Tab = 'home' | 'upcoming' | 'progress' | 'add' | 'settings' | 'reset'
