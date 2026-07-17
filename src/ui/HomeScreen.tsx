@@ -3,6 +3,13 @@
  * 表示内容: 今日やる宿題、今日の予定時間、今日の残り時間、全体進捗
  * 最大ボタン: 「今日の勉強開始」→おすすめ順で宿題を表示
  * 順番変更は当日限りの一時的な並び替え（優先度計算へはフィードバックしない）
+ *
+ * 変更点:
+ *   - 「今日の勉強開始」を押した時点のtodayTasksをスナップショットとして固定し、
+ *     以後記録してもリストから消えないようにした（記録するとカードが消える問題の修正）
+ *   - 各カードに「今日Xページ中Yページ」の進捗バーを表示するようにした
+ *   - 今日の目標（plannedAmount）を達成した宿題には達成バッジを表示するが、
+ *     記録UI自体は残し、余分にやりたい場合も引き続き記録できるようにした
  */
 
 import { useState } from 'react'
@@ -11,6 +18,8 @@ import { getHomeScreenData } from '../engine/home-screen-data'
 import type { TodayTaskView } from '../engine/home-screen-data'
 import { RecordPanel } from './RecordPanel'
 import { getPageUnitLabel } from '../domain/assignment'
+import { useStudySessionStore } from '../store/study-session-store'
+import { calculateTodayRecordedAmount } from '../engine/today-progress'
 
 interface HomeScreenProps {
   date: string
@@ -41,16 +50,41 @@ function getActivePhaseId(assignment: Assignment | undefined): string | undefine
   return activePhase?.id
 }
 
+/** 今日の目標・実績量を、宿題タイプに応じた読みやすい表示文字列にする */
+function formatAmount(amount: number, assignment: Assignment | undefined): string {
+  if (assignment?.type === 'creative' || assignment?.type === 'project') {
+    return `${Math.round(amount * 100)}%`
+  }
+  // ページ・項目は小数第1位までで丸めて表示（1ページ未満の端数も見えるように）
+  return `${Math.round(amount * 10) / 10}`
+}
+
+/** creative/project型は割合(%)表示のため、量の後ろに単位ラベルを付けない */
+function isPercentageType(assignment: Assignment | undefined): boolean {
+  return assignment?.type === 'creative' || assignment?.type === 'project'
+}
+
 export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
   const data = getHomeScreenData(date, assignments, settings)
+  const sessions = useStudySessionStore((s) => s.sessions)
   const [started, setStarted] = useState(false)
+  // 「今日の勉強開始」を押した時点のtodayTasksを固定するスナップショット。
+  // これを導入しないと、記録するたびに再計算されたtodayTasksから
+  // 目標達成済みの宿題が消えてしまう（当日中に一覧から見えなくなる問題）。
+  const [snapshot, setSnapshot] = useState<TodayTaskView[] | null>(null)
   // 当日限りの一時的な並び替え。優先度計算にはフィードバックしない（16章）
   const [order, setOrder] = useState<TodayTaskView[] | null>(null)
 
-  const displayTasks = order ?? data.todayTasks
+  function handleStart() {
+    setSnapshot(data.todayTasks)
+    setStarted(true)
+  }
+
+  const baseTasks = snapshot ?? data.todayTasks
+  const displayTasks = order ?? baseTasks
 
   function moveTask(index: number, direction: -1 | 1) {
-    const base = order ?? data.todayTasks
+    const base = order ?? baseTasks
     const next = [...base]
     const target = index + direction
     if (target < 0 || target >= next.length) return
@@ -87,7 +121,7 @@ export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
       {!started && (
         <button
           type="button"
-          onClick={() => setStarted(true)}
+          onClick={handleStart}
           className="w-full rounded-xl bg-indigo-600 py-4 text-lg font-bold text-white shadow-sm"
         >
           今日の勉強開始
@@ -106,6 +140,18 @@ export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
           )}
           {displayTasks.map((task, index) => {
             const assignment = assignments.find((a) => a.id === task.assignmentId)
+            const goalAmount = task.plannedAmount
+            const recordedAmount = calculateTodayRecordedAmount(
+              sessions,
+              task.assignmentId,
+              date,
+            )
+            const isGoalReached = goalAmount !== undefined && recordedAmount >= goalAmount
+            const progressPercent =
+              goalAmount !== undefined && goalAmount > 0
+                ? Math.min(100, Math.round((recordedAmount / goalAmount) * 100))
+                : null
+
             return (
               <div key={task.assignmentId} className="space-y-2">
                 <div className="flex items-center justify-between rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-500">
@@ -138,6 +184,37 @@ export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
                     </button>
                   </div>
                 </div>
+
+                {/* 今日の進捗バー：予定量に対する記録量の割合を表示する */}
+                {goalAmount !== undefined && task.unitLabel && (
+                  <div className="rounded-md bg-white px-3 py-2 shadow-sm">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500">
+                        今日: {formatAmount(recordedAmount, assignment)}
+                        {!isPercentageType(assignment) && task.unitLabel}
+                        {' / '}
+                        {formatAmount(goalAmount, assignment)}
+                        {!isPercentageType(assignment) && task.unitLabel}
+                      </span>
+                      {isGoalReached && (
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
+                          今日の分は完了！
+                        </span>
+                      )}
+                    </div>
+                    {progressPercent !== null && (
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            isGoalReached ? 'bg-emerald-500' : 'bg-indigo-500'
+                          }`}
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <RecordPanel
                   taskId={task.assignmentId}
                   assignmentId={task.assignmentId}
