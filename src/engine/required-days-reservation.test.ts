@@ -69,7 +69,7 @@ describe('calculateReservableMinutes', () => {
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
     const target = makeProjectAssignment({ deadline: '2026-08-31' })
-    const reservable = calculateReservableMinutes('2026-07-20', target, [], settings)
+    const reservable = calculateReservableMinutes('2026-07-20', [], settings)
     expect(reservable).toBeCloseTo(100)
   })
 
@@ -84,7 +84,7 @@ describe('calculateReservableMinutes', () => {
       estimatedMinutesPerPage: 3, // 残り30分
       deadline: '2026-07-25', // 素の残り日数6日、デフォルトバッファ(固定2日)適用後の実効残り日数は4日
     })
-    const reservable = calculateReservableMinutes('2026-07-20', target, [other], settings)
+    const reservable = calculateReservableMinutes('2026-07-20', [other], settings)
     // ペース = 30分 / 4日 = 7.5分/日、reservable = 100 - 7.5 = 92.5分
     expect(reservable).toBeCloseTo(92.5)
   })
@@ -100,7 +100,7 @@ describe('calculateReservableMinutes', () => {
       estimatedMinutesPerPage: 10, // 残り1000分
       deadline: '2026-07-20', // 実効残り日数1日 → ペース1000分/日
     })
-    const reservable = calculateReservableMinutes('2026-07-20', target, [other], settings)
+    const reservable = calculateReservableMinutes('2026-07-20', [other], settings)
     expect(reservable).toBe(0)
   })
 })
