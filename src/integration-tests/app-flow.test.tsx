@@ -19,6 +19,14 @@ describe('結合テスト(UI): 初回設定 → 宿題登録 → ホーム画面
       expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument()
     })
 
+    // ログイン画面が表示されるため、テストでは「ログインせずにこの端末だけで使う」を選ぶ
+    fireEvent.click(await screen.findByText('ログインせずにこの端末だけで使う'))
+
+    // スキップ後、データ読み込みが終わるまで待つ
+    await waitFor(() => {
+      expect(screen.queryByText('読み込み中...')).not.toBeInTheDocument()
+    })
+
     // ステップ①〜④: 「次へ」を4回押して⑤（締切バッファ設定）まで進む
     fireEvent.click(screen.getByText('次へ')) // ①→②
     fireEvent.click(screen.getByText('次へ')) // ②→③
