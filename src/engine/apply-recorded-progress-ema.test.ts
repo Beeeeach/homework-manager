@@ -52,7 +52,7 @@ describe('applyRecordedProgress（EMAによる予想時間の学習）', () => {
     if (result.type === 'page') {
       expect(result.currentPage).toBe(10)
       expect(result.estimatedMinutesPerPage).toBe(5) // 変化しない
-      expect(result.estimateSampleCount).toBeUndefined()
+      expect(result.estimateSampleCount).toBe(0) // 元の値のまま変化しない
     }
   })
 
