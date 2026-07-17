@@ -101,7 +101,7 @@ export function scheduleForDay(
 
     // 今日はこのAssignmentの予約区間に含まれる → 固定枠を確保する
     // 基本は専有（他の必要ペース分は残しつつ、それ以外を専有）
-    const reservableMinutes = calculateReservableMinutes(date, target, otherAssignments, settings)
+    const reservableMinutes = calculateReservableMinutes(date, otherAssignments, settings)
     const fixedMinutes = Math.min(remainingMinutes, reservableMinutes, remainingCapacityAfterFixed)
 
     if (fixedMinutes <= 0) continue
