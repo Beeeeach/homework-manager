@@ -5,8 +5,10 @@
  * 順番変更は当日限りの一時的な並び替え（優先度計算へはフィードバックしない）
  *
  * 変更点:
- *   - 「今日の勉強開始」を押した時点のtodayTasksをスナップショットとして固定し、
- *     以後記録してもリストから消えないようにした（記録するとカードが消える問題の修正）
+ *   - 「今日の勉強開始」を押した時点のtodayTasksを、app-data-store（永続化される）の
+ *     todaySnapshotとして保存するようにした。これにより、記録して残り時間が変化しても、
+ *     またページの再読み込みやブラウザの再起動をまたいでも、その日のうちは同じ予定が
+ *     保持される（翌日になれば persistence-coordinator が自動的に無効化する）。
  *   - 各カードに「今日Xページ中Yページ」の進捗バーを表示するようにした
  *   - 今日の目標（plannedAmount）を達成した宿題には達成バッジを表示するが、
  *     記録UI自体は残し、余分にやりたい場合も引き続き記録できるようにした
@@ -19,6 +21,7 @@ import type { TodayTaskView } from '../engine/home-screen-data'
 import { RecordPanel } from './RecordPanel'
 import { getPageUnitLabel } from '../domain/assignment'
 import { useStudySessionStore } from '../store/study-session-store'
+import { useAppDataStore } from '../store/app-data-store'
 import { calculateTodayRecordedAmount } from '../engine/today-progress'
 
 interface HomeScreenProps {
@@ -67,20 +70,19 @@ function isPercentageType(assignment: Assignment | undefined): boolean {
 export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
   const data = getHomeScreenData(date, assignments, settings)
   const sessions = useStudySessionStore((s) => s.sessions)
-  const [started, setStarted] = useState(false)
-  // 「今日の勉強開始」を押した時点のtodayTasksを固定するスナップショット。
-  // これを導入しないと、記録するたびに再計算されたtodayTasksから
-  // 目標達成済みの宿題が消えてしまう（当日中に一覧から見えなくなる問題）。
-  const [snapshot, setSnapshot] = useState<TodayTaskView[] | null>(null)
+  const todaySnapshot = useAppDataStore((s) => s.todaySnapshot)
+  const setTodaySnapshot = useAppDataStore((s) => s.setTodaySnapshot)
   // 当日限りの一時的な並び替え。優先度計算にはフィードバックしない（16章）
+  // （並び替えは永続化しない仕様のため、こちらはuseStateのままでよい）
   const [order, setOrder] = useState<TodayTaskView[] | null>(null)
 
+  const started = todaySnapshot !== null && todaySnapshot.date === date
+
   function handleStart() {
-    setSnapshot(data.todayTasks)
-    setStarted(true)
+    setTodaySnapshot({ date, tasks: data.todayTasks })
   }
 
-  const baseTasks = snapshot ?? data.todayTasks
+  const baseTasks = started ? todaySnapshot.tasks : []
   const displayTasks = order ?? baseTasks
 
   function moveTask(index: number, direction: -1 | 1) {
