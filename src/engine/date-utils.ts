@@ -53,3 +53,21 @@ export function isWithinRange(
 ): boolean {
   return date >= start && date <= end
 }
+
+/**
+ * 以下は既存の src/engine/date-utils.ts の末尾に追加してください。
+ * （実際の「今日」の日付をYYYY-MM-DD形式で取得する関数）
+ */
+
+/**
+ * ブラウザの現在時刻から、実際の「今日」の日付をYYYY-MM-DD形式で返す。
+ * ローカルタイムゾーンでの「今日」を返す（ユーザーが実際にカレンダー上で
+ * 認識する日付と一致させるため、UTCではなくローカル時刻の年月日を使う）。
+ */
+export function getTodayDateString(): DateString {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
