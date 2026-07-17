@@ -22,10 +22,10 @@ describe('findBestConsecutiveWindow', () => {
     expect(window).toHaveLength(3)
   })
 
-  it('他の宿題の締切が迫っている期間を避け、余裕のある連続区間を選ぶ', () => {
+  it('他の宿題の締切間近の期間ほど余裕度が低く、締切から離れた期間ほど余裕度が高くなる', () => {
     const settings = makeUserSettings({
       vacationPeriod: { startDate: '2026-07-20', endDate: '2026-08-10' },
-      weekdayStudyMinutes: { 0: 60, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60 },
+      weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
     const target = makeProjectAssignment({
       id: 'project',
@@ -33,20 +33,20 @@ describe('findBestConsecutiveWindow', () => {
       deadline: '2026-08-10',
       requiredDays: 3,
     })
-    // 他の宿題は7/20締切で残り時間が大きい → 7/20周辺は余裕度が低いはず
-    const urgent = makePageAssignment({
-      id: 'urgent',
+    // 他の宿題は7/25締切。7/20時点は実効残り日数が短く必要ペースが高いが、
+    // 締切を過ぎた7/26以降は対象から自然に外れ、余裕度が回復するはず
+    const other = makePageAssignment({
+      id: 'other',
       totalPages: 100,
       currentPage: 0,
       estimatedMinutesPerPage: 10, // 残り1000分
-      deadline: '2026-07-21', // 明日締切、急ぎ
+      deadline: '2026-07-25',
     })
 
-    const window = findBestConsecutiveWindow(target, [urgent], settings, 3)
+    const window = findBestConsecutiveWindow(target, [other], settings, 3)
     expect(window).not.toBeNull()
-    // 選ばれた区間には、緊急宿題の締切日（7/20か7/21）が含まれにくいはず
-    // 少なくとも先頭日（7/20）は選ばれないことを確認する
-    expect(window![0]).not.toBe('2026-07-20')
+    // 締切7/25を含まない、より後半の連続区間が選ばれるはず
+    expect(window!.every((d) => d > '2026-07-25')).toBe(true)
   })
 
   it('期間がrequiredDaysより短ければnullを返す', () => {
@@ -73,7 +73,7 @@ describe('calculateReservableMinutes', () => {
     expect(reservable).toBeCloseTo(100)
   })
 
-  it('他の宿題の必要ペース分は差し引かれる', () => {
+  it('他の宿題の必要ペース分は差し引かれる（実効残り日数は締切バッファ適用後の値）', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
@@ -82,11 +82,11 @@ describe('calculateReservableMinutes', () => {
       totalPages: 10,
       currentPage: 0,
       estimatedMinutesPerPage: 3, // 残り30分
-      deadline: '2026-07-25', // 実効残り日数6日 → ペース5分/日
+      deadline: '2026-07-25', // 素の残り日数6日、デフォルトバッファ(固定2日)適用後の実効残り日数は4日
     })
     const reservable = calculateReservableMinutes('2026-07-20', target, [other], settings)
-    // 100 - 5 = 95分程度
-    expect(reservable).toBeCloseTo(95, 0)
+    // ペース = 30分 / 4日 = 7.5分/日、reservable = 100 - 7.5 = 92.5分
+    expect(reservable).toBeCloseTo(92.5)
   })
 
   it('他の宿題の必要ペースがcapacityを超える場合は0になる（マイナスにはならない）', () => {
