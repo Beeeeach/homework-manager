@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { scheduleForDay } from './schedule-day'
-import { makePageAssignment, makeUserSettings, makeRepetitionAssignment } from '../domain/test-factories'
+import {
+  makePageAssignment,
+  makeUserSettings,
+  makeRepetitionAssignment,
+  makeProjectAssignment,
+} from '../domain/test-factories'
 
 describe('scheduleForDay（統合）', () => {
   it('単一の宿題のみで、残り時間がcapacity以上なら、その日のcapacityを全て受け取る', () => {
@@ -175,5 +180,42 @@ describe('scheduleForDay（統合）', () => {
     // capacity上限でクリップされ、20分がまるごと確保される
     expect(repAlloc.allocatedMinutes).toBeCloseTo(20)
     expect(repAlloc.excludedByMinimum).toBe(false)
+  })
+
+  it('必要日数指定つきプロジェクト型は、予約された連続区間内で固定枠を確保する', () => {
+    const settings = makeUserSettings({
+      vacationPeriod: { startDate: '2026-07-20', endDate: '2026-08-31' },
+      weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
+    })
+    const project = makeProjectAssignment({
+      id: 'project',
+      createdAt: '2026-07-20',
+      deadline: '2026-07-30',
+      estimatedTotalMinutes: 600,
+      requiredDays: 3,
+    })
+    // 他に宿題がなければ、期間の最初の3日間のいずれかで固定枠が確保されるはず
+    const result = scheduleForDay('2026-07-20', [project], settings)
+    const projectAlloc = result.allocations.find((a) => a.assignmentId === 'project')
+
+    // 予約区間に含まれていれば固定枠が確保される（他に宿題がないため専有＝capacity分）
+    expect(projectAlloc).toBeDefined()
+    expect(projectAlloc!.allocatedMinutes).toBeGreaterThan(0)
+  })
+
+  it('requiredDays未指定の創作・プロジェクト型は、従来通り通常の集中配分のみで扱われる', () => {
+    const settings = makeUserSettings({
+      weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
+    })
+    const project = makeProjectAssignment({
+      id: 'project',
+      estimatedTotalMinutes: 600,
+      deadline: '2026-08-31',
+      // requiredDaysを指定しない
+    })
+    const result = scheduleForDay('2026-07-20', [project], settings)
+    const projectAlloc = result.allocations.find((a) => a.assignmentId === 'project')!
+    // 通常の集中配分により、capacity分（100分）が配分される
+    expect(projectAlloc.allocatedMinutes).toBeCloseTo(100)
   })
 })
