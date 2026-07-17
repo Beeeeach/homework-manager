@@ -26,6 +26,11 @@ import { getEffectiveRemainingDays } from './priority'
 /**
  * 指定日について、対象宿題(target)以外の宿題群の「最低限必要なペース（分/日）」を計算する。
  * 各宿題の (残り時間 / 実効残り日数) の合計。
+ *
+ * 注意: この計算は「その日時点でのAssignmentの状態」をそのまま使う静的なスナップショット
+ * 計算であり、日をまたぐ進捗の減少（advanceAssignmentsのような動的反映）は行わない。
+ * そのため、指定日が対象宿題の締切を過ぎている場合はペース計算から除外する
+ * （本来はその締切までに完了しているはず、という前提を置く）。
  */
 function calculateOtherAssignmentsPace(
   date: DateString,
@@ -34,6 +39,8 @@ function calculateOtherAssignmentsPace(
 ): number {
   return otherAssignments.reduce((sum, a) => {
     if (a.isCompleted) return sum
+    // 指定日が締切を過ぎている宿題は、本来その時点で終わっているはずなので対象外にする
+    if (diffDays(date, a.deadline) < 0) return sum
     const remainingMinutes = getRemainingMinutes(a)
     if (remainingMinutes <= 0) return sum
     const effectiveRemainingDays = getEffectiveRemainingDays(date, a.deadline, settings)
