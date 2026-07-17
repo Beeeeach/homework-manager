@@ -69,7 +69,9 @@ export function RecordPanel({
     const amount = Number(amountInput)
     if (!Number.isFinite(amount) || amount < 0) return
     stopStopwatch(amount)
-    recordProgress(assignmentId, { amount, phaseId })
+    // ストップウォッチの経過時間（分）を実測値としてEMA更新に使う
+    const actualMinutes = elapsedMs / 60000
+    recordProgress(assignmentId, { amount, phaseId, actualMinutes })
     setAmountInput('')
     onRecorded?.()
   }
@@ -80,7 +82,7 @@ export function RecordPanel({
     if (!Number.isFinite(amount) || amount < 0) return
     if (!Number.isFinite(minutes) || minutes <= 0) return
     addManualSession({ taskId, assignmentId, actualAmount: amount, actualMinutes: minutes })
-    recordProgress(assignmentId, { amount, phaseId })
+    recordProgress(assignmentId, { amount, phaseId, actualMinutes: minutes })
     setAmountInput('')
     setManualMinutes('')
     onRecorded?.()
