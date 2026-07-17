@@ -78,6 +78,10 @@ export function AssignmentForm({
 
   // 創作型
   const [targetCharCount, setTargetCharCount] = useState('1200')
+  const [creativeRequiredDays, setCreativeRequiredDays] = useState('')
+
+  // プロジェクト型
+  const [projectRequiredDays, setProjectRequiredDays] = useState('')
 
   const [warning, setWarning] = useState<string | null>(null)
 
@@ -114,6 +118,7 @@ export function AssignmentForm({
     }
     if (type === 'creative') {
       const charCount = Number(targetCharCount)
+      const requiredDays = creativeRequiredDays ? Number(creativeRequiredDays) : undefined
       return {
         ...base,
         type: 'creative',
@@ -127,21 +132,26 @@ export function AssignmentForm({
           progressRatio: 0,
           isCompleted: false,
         })),
+        ...(requiredDays ? { requiredDays } : {}),
       }
     }
     // project
-    return {
-      ...base,
-      type: 'project',
-      estimatedTotalMinutes: estimateProjectTotalMinutes(PROJECT_TEMPLATE_PHASES.length),
-      isEstimateManual: false,
-      phases: PROJECT_TEMPLATE_PHASES.map((p) => ({
-        id: crypto.randomUUID(),
-        name: p.name,
-        ratio: p.ratio,
-        progressRatio: 0,
-        isCompleted: false,
-      })),
+    {
+      const requiredDays = projectRequiredDays ? Number(projectRequiredDays) : undefined
+      return {
+        ...base,
+        type: 'project',
+        estimatedTotalMinutes: estimateProjectTotalMinutes(PROJECT_TEMPLATE_PHASES.length),
+        isEstimateManual: false,
+        phases: PROJECT_TEMPLATE_PHASES.map((p) => ({
+          id: crypto.randomUUID(),
+          name: p.name,
+          ratio: p.ratio,
+          progressRatio: 0,
+          isCompleted: false,
+        })),
+        ...(requiredDays ? { requiredDays } : {}),
+      }
     }
   }
 
@@ -313,25 +323,57 @@ export function AssignmentForm({
       )}
 
       {type === 'creative' && (
-        <label className="mt-2 block text-xs text-slate-500">
-          目標文字数
-          <input
-            type="number"
-            value={targetCharCount}
-            onChange={(e) => setTargetCharCount(e.target.value)}
-            className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
-          />
-          <span className="mt-1 block text-xs text-slate-400">
-            推定合計時間: 約{estimateCreativeTotalMinutes(Number(targetCharCount) || 0)}分（自動推定）
-          </span>
-        </label>
+        <div className="mt-2 space-y-2">
+          <label className="block text-xs text-slate-500">
+            目標文字数
+            <input
+              type="number"
+              value={targetCharCount}
+              onChange={(e) => setTargetCharCount(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              推定合計時間: 約{estimateCreativeTotalMinutes(Number(targetCharCount) || 0)}分（自動推定）
+            </span>
+          </label>
+          <label className="block text-xs text-slate-500">
+            必要日数（任意。空欄なら通常配分のみ）
+            <input
+              type="number"
+              min="1"
+              value={creativeRequiredDays}
+              onChange={(e) => setCreativeRequiredDays(e.target.value)}
+              placeholder="例: 5"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              入力すると、できるだけ連続した日でその日数分を優先的に確保します。
+            </span>
+          </label>
+        </div>
       )}
 
       {type === 'project' && (
-        <p className="mt-2 text-xs text-slate-400">
-          工程（テーマ決定・情報収集・実験・結果整理・考察・レポート）は自動生成されます。
-          推定合計時間: 約{estimateProjectTotalMinutes(PROJECT_TEMPLATE_PHASES.length)}分（自動推定）
-        </p>
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-slate-400">
+            工程（テーマ決定・情報収集・実験・結果整理・考察・レポート）は自動生成されます。
+            推定合計時間: 約{estimateProjectTotalMinutes(PROJECT_TEMPLATE_PHASES.length)}分（自動推定）
+          </p>
+          <label className="block text-xs text-slate-500">
+            必要日数（任意。空欄なら通常配分のみ）
+            <input
+              type="number"
+              min="1"
+              value={projectRequiredDays}
+              onChange={(e) => setProjectRequiredDays(e.target.value)}
+              placeholder="例: 5"
+              className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              入力すると、できるだけ連続した日でその日数分を優先的に確保します。
+            </span>
+          </label>
+        </div>
       )}
 
       {warning && (
