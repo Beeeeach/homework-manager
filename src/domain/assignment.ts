@@ -38,6 +38,11 @@ export interface PageAssignment extends AssignmentBase {
   estimatedMinutesPerPage: number
   /** 数える単位の表示ラベル（例:「ページ」「章」「問」「回」）。省略時は「ページ」として扱う */
   unitLabel?: string
+  /**
+   * estimatedMinutesPerPageをEMAで更新した回数（仕様書14章）。
+   * 記録のたびに実測値を反映して増える。省略時は0（まだ実測に基づく更新がない状態）。
+   */
+  estimateSampleCount?: number
 }
 
 /**
@@ -63,6 +68,8 @@ export interface RepetitionAssignment extends AssignmentBase {
   cycleCount?: number
   /** N日に1回のペースで行うか。省略時は1（毎日） */
   frequencyDays?: number
+  /** estimatedMinutesPerItemをEMAで更新した回数（仕様書14章）。省略時は0 */
+  estimateSampleCount?: number
 }
 
 /** RepetitionAssignmentのcycleCountを取得する（省略時は1） */
