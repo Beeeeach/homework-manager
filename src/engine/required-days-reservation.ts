@@ -90,11 +90,10 @@ export function findBestConsecutiveWindow(
 /**
  * 指定日について、他宿題の必要ペースを差し引いてもなお専有できる余裕があるかを判定する。
  * 余裕がなければ「部分確保」（他の必要ペース分は残し、余った分だけ専有）にする。
- * 戻り値は、その日にtargetへ割り当ててよい上限時間（分）。
+ * 戻り値は、その日に対象宿題へ割り当ててよい上限時間（分）。
  */
 export function calculateReservableMinutes(
   date: DateString,
-  target: Assignment,
   otherAssignments: Assignment[],
   settings: UserSettings,
 ): number {
