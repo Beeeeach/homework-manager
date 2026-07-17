@@ -68,7 +68,6 @@ describe('calculateReservableMinutes', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
-    const target = makeProjectAssignment({ deadline: '2026-08-31' })
     const reservable = calculateReservableMinutes('2026-07-20', [], settings)
     expect(reservable).toBeCloseTo(100)
   })
@@ -77,7 +76,6 @@ describe('calculateReservableMinutes', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
-    const target = makeProjectAssignment({ deadline: '2026-08-31' })
     const other = makePageAssignment({
       totalPages: 10,
       currentPage: 0,
@@ -93,7 +91,6 @@ describe('calculateReservableMinutes', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 60, 1: 60, 2: 60, 3: 60, 4: 60, 5: 60, 6: 60 },
     })
-    const target = makeProjectAssignment({ deadline: '2026-08-31' })
     const other = makePageAssignment({
       totalPages: 100,
       currentPage: 0,
