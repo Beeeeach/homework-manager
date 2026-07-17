@@ -91,7 +91,12 @@ export interface Phase {
   isCompleted: boolean
 }
 
-/** ③ 創作型（読書感想文、作文、小論文など） */
+/**
+ * ③ 創作型（読書感想文、作文、小論文など）
+ * requiredDaysで「確実に確保したい必要日数」を指定できる（省略可）。
+ * 指定した場合、スケジューリングエンジンはできる限り連続した日で
+ * その日数分を専有的に確保しようとする。
+ */
 export interface CreativeAssignment extends AssignmentBase {
   type: 'creative'
   targetCharCount: number
@@ -104,6 +109,8 @@ export interface CreativeAssignment extends AssignmentBase {
   estimatedTotalMinutes: number
   isEstimateManual: boolean
   phases: Phase[]
+  /** 確実に確保したい必要日数。省略時はこの機能を使わず、通常の集中配分のみで扱う */
+  requiredDays?: number
 }
 
 /** ④ プロジェクト型（自由研究、工作、探究など） */
@@ -113,6 +120,15 @@ export interface ProjectAssignment extends AssignmentBase {
   estimatedTotalMinutes: number
   isEstimateManual: boolean
   phases: Phase[]
+  /** 確実に確保したい必要日数。省略時はこの機能を使わず、通常の集中配分のみで扱う */
+  requiredDays?: number
+}
+
+/** creative/project型の必要日数を取得する（未指定ならundefined＝機能オフ） */
+export function getRequiredDays(
+  assignment: CreativeAssignment | ProjectAssignment,
+): number | undefined {
+  return assignment.requiredDays
 }
 
 /** 4タイプをまとめたユニオン型。エンジン層はこの型を主に扱う */
