@@ -32,6 +32,8 @@ interface AssignmentFormProps {
   onFinish: () => void
   /** 宿題を削除する。省略時は削除ボタンを表示しない */
   onDelete?: (assignmentId: Id) => void
+  /** 宿題をクリックして詳細編集画面を開く。省略時は一覧はクリック不可 */
+  onSelectAssignment?: (assignmentId: Id) => void
   /** 「登録を終える」ボタンの表示文言。省略時は「登録を終える」（初回設定フロー用のデフォルト） */
   finishLabel?: string
 }
@@ -57,6 +59,7 @@ export function AssignmentForm({
   onAdd,
   onFinish,
   onDelete,
+  onSelectAssignment,
   finishLabel = '登録を終える',
 }: AssignmentFormProps) {
   const [type, setType] = useState<HomeworkType>('page')
@@ -403,7 +406,17 @@ export function AssignmentForm({
         <ul className="mt-3 space-y-1 text-xs text-slate-500">
           {existingAssignments.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-2">
-              <span>・{assignmentSummaryLabel(a)}</span>
+              {onSelectAssignment ? (
+                <button
+                  type="button"
+                  onClick={() => onSelectAssignment(a.id)}
+                  className="text-left underline decoration-dotted underline-offset-2 hover:text-indigo-600"
+                >
+                  ・{assignmentSummaryLabel(a)}
+                </button>
+              ) : (
+                <span>・{assignmentSummaryLabel(a)}</span>
+              )}
               {onDelete && (
                 <button
                   type="button"
