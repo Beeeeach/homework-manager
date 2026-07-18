@@ -52,7 +52,7 @@ import type { UserSettings } from '../domain'
 import { isOccurrenceDay, calculateItemsPerOccurrence } from './repetition-frequency'
 import { findBestConsecutiveWindow, calculateReservableMinutes } from './required-days-reservation'
 import { isDateWithinSchedulableRange } from './deadline-buffer-check'
-import { getMaxMinutesPerAssignmentPerDay } from '../domain/settings'
+import { getAdvancedSchedulingSettings } from '../domain/settings'
 
 export interface DayScheduleResult {
   date: DateString
@@ -87,7 +87,7 @@ export function scheduleForDay(
 ): DayScheduleResult {
   const capacityMinutes = getCapacityMinutes(date, settings)
   const dayWeight = getDayWeight(date, settings)
-  const maxMinutesPerAssignment = getMaxMinutesPerAssignmentPerDay(settings)
+  const advancedScheduling = getAdvancedSchedulingSettings(settings)
 
   // 完了済み、および「頻度指定つき反復型で今日が実施日でないもの」を対象から除外する
   const candidates = assignments.filter((a) => {
@@ -178,11 +178,11 @@ export function scheduleForDay(
     isUrgent: isUrgent(date, s.assignment.deadline),
   }))
 
-  const results = allocateCapacity(
-    remainingCapacityAfterFixed,
-    allocationInputs,
-    maxMinutesPerAssignment,
-  )
+  const results = allocateCapacity(remainingCapacityAfterFixed, allocationInputs, {
+    blockMinutes: advancedScheduling.blockMinutes,
+    maxAssignmentsPerDay: advancedScheduling.maxAssignmentsPerDay,
+    maxMinutesPerAssignment: advancedScheduling.maxMinutesPerAssignmentPerDay,
+  })
 
   const flexibleAllocations = results.map((r) => {
     const scoreInfo = scored.find((s) => s.assignment.id === r.assignmentId)!
