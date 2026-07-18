@@ -16,7 +16,8 @@ import type {
   Weekday,
   WeekdayStudyMinutes,
 } from '../domain'
-import { DEFAULT_DEADLINE_BUFFER } from '../domain/settings'
+import { DEFAULT_DEADLINE_BUFFER, DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY } from '../domain/settings'
+import { getTodayDateString, addDays } from '../engine/date-utils'
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   0: '日',
@@ -39,8 +40,11 @@ interface SetupWizardProps {
 export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [step, setStep] = useState(1)
 
-  const [startDate, setStartDate] = useState('2026-07-20')
-  const [endDate, setEndDate] = useState('2026-08-31')
+  // デフォルトの休暇期間は「今日から40日間」とする（固定日付にすると、実際の日付が
+  // それより後になった場合に「休暇期間外」扱いになってしまうため、必ず動的に計算する）
+  const today = getTodayDateString()
+  const [startDate, setStartDate] = useState(today)
+  const [endDate, setEndDate] = useState(addDays(today, 40))
 
   const [weekdayMinutes, setWeekdayMinutes] = useState<WeekdayStudyMinutes>({
     0: 60,
@@ -57,6 +61,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [specialSchedules, setSpecialSchedules] = useState<SpecialSchedule[]>([])
   const [deadlineBuffer, setDeadlineBuffer] = useState<DeadlineBufferSettings>(
     DEFAULT_DEADLINE_BUFFER,
+  )
+  const [maxMinutesPerAssignment, setMaxMinutesPerAssignment] = useState(
+    String(DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY),
   )
 
   function applyBulkMinutes() {
@@ -126,6 +133,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       recurringSchedules,
       specialSchedules,
       deadlineBuffer,
+      maxMinutesPerAssignmentPerDay: Number(maxMinutesPerAssignment) || undefined,
     })
   }
 
@@ -461,6 +469,20 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               </div>
             </label>
           )}
+
+          <label className="mt-4 block text-xs text-slate-500">
+            1つの宿題に使う時間の上限（1日あたり・分）
+            <input
+              type="number"
+              min={1}
+              value={maxMinutesPerAssignment}
+              onChange={(e) => setMaxMinutesPerAssignment(e.target.value)}
+              className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+            <span className="mt-1 block text-xs text-slate-400">
+              同じ宿題ばかりに1日中偏らないようにするための上限です。
+            </span>
+          </label>
 
           <div className="mt-4 flex gap-2">
             <button
