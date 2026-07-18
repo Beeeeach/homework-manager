@@ -1,12 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { allocateCapacity } from './allocate-capacity'
-import { BLOCK_MINUTES, MAX_ASSIGNMENTS_PER_DAY } from '../config/constants'
+import type { AllocateCapacityOptions } from './allocate-capacity'
 
 // このテストファイルは「集中配分」自体のロジック（誰から先に、何分ブロックで配分するか）を
 // 検証するためのものなので、1宿題あたりの1日上限（maxMinutesPerAssignment）による影響を
 // 受けないよう、ここでは十分大きな値を指定する。上限自体の挙動を検証するテストは
 // このファイルの末尾に別途追加している。
-const NO_PRACTICAL_LIMIT = 100000
+const BLOCK_MINUTES = 30
+const MAX_ASSIGNMENTS_PER_DAY = 3
+
+const DEFAULT_OPTIONS: AllocateCapacityOptions = {
+  blockMinutes: BLOCK_MINUTES,
+  maxAssignmentsPerDay: MAX_ASSIGNMENTS_PER_DAY,
+  maxMinutesPerAssignment: 100000, // 実質無制限
+}
+
+function withOptions(overrides: Partial<AllocateCapacityOptions> = {}): AllocateCapacityOptions {
+  return { ...DEFAULT_OPTIONS, ...overrides }
+}
 
 describe('allocateCapacity（集中配分方式）', () => {
   it('スコア最上位から順に、残り時間ぶんまとめて配分される', () => {
@@ -16,7 +27,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'a', score: 30, remainingMinutes: 40, isUrgent: false },
         { assignmentId: 'b', score: 70, remainingMinutes: 50, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const a = result.find((r) => r.assignmentId === 'a')!
     const b = result.find((r) => r.assignmentId === 'b')!
@@ -36,7 +47,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'b', score: 33, remainingMinutes: 200, isUrgent: false },
         { assignmentId: 'c', score: 34, remainingMinutes: 200, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const total = result.reduce((sum, r) => sum + r.allocatedMinutes, 0)
     expect(total).toBeLessThanOrEqual(100)
@@ -51,7 +62,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'small', score: 100, remainingMinutes: 20, isUrgent: false },
         { assignmentId: 'big', score: 50, remainingMinutes: 100, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const small = result.find((r) => r.assignmentId === 'small')!
     const big = result.find((r) => r.assignmentId === 'big')!
@@ -69,7 +80,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'urgent-small', score: 100, remainingMinutes: 10, isUrgent: true },
         { assignmentId: 'big', score: 50, remainingMinutes: 100, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const urgentSmall = result.find((r) => r.assignmentId === 'urgent-small')!
     const big = result.find((r) => r.assignmentId === 'big')!
@@ -88,7 +99,7 @@ describe('allocateCapacity（集中配分方式）', () => {
       isUrgent: false,
     }))
 
-    const result = allocateCapacity(1000, inputs, NO_PRACTICAL_LIMIT)
+    const result = allocateCapacity(1000, inputs, withOptions())
     const assignedCount = result.filter((r) => !r.excludedByMinimum).length
 
     expect(assignedCount).toBe(MAX_ASSIGNMENTS_PER_DAY)
@@ -106,7 +117,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'a', score: 10, remainingMinutes: 100, isUrgent: false },
         { assignmentId: 'zero', score: 0, remainingMinutes: 100, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const zero = result.find((r) => r.assignmentId === 'zero')!
     expect(zero.excludedByMinimum).toBe(true)
@@ -120,14 +131,14 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'a', score: 10, remainingMinutes: 100, isUrgent: false },
         { assignmentId: 'b', score: 20, remainingMinutes: 100, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     expect(result.every((r) => r.allocatedMinutes === 0)).toBe(true)
     expect(result.every((r) => r.excludedByMinimum)).toBe(true)
   })
 
   it('入力が空配列なら空配列を返す', () => {
-    expect(allocateCapacity(100, [], NO_PRACTICAL_LIMIT)).toEqual([])
+    expect(allocateCapacity(100, [], withOptions())).toEqual([])
   })
 
   it('残り時間がBLOCK_MINUTES未満の宿題が複数連続しても、緊急でなければ全てスキップされ次の宿題に回る', () => {
@@ -138,7 +149,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'small2', score: 90, remainingMinutes: 15, isUrgent: false },
         { assignmentId: 'big', score: 80, remainingMinutes: 200, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     const small1 = result.find((r) => r.assignmentId === 'small1')!
     const small2 = result.find((r) => r.assignmentId === 'small2')!
@@ -156,7 +167,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'a', score: 1, remainingMinutes: 10, isUrgent: false },
         { assignmentId: 'b', score: 1, remainingMinutes: 10, isUrgent: false },
       ],
-      NO_PRACTICAL_LIMIT,
+      withOptions(),
     )
     expect(result.every((r) => r.excludedByMinimum)).toBe(true)
     expect(result.every((r) => r.allocatedMinutes === 0)).toBe(true)
@@ -167,7 +178,7 @@ describe('allocateCapacity（集中配分方式）', () => {
     const result = allocateCapacity(
       200,
       [{ assignmentId: 'a', score: 10, remainingMinutes: 200, isUrgent: false }],
-      90,
+      withOptions({ maxMinutesPerAssignment: 90 }),
     )
     const a = result.find((r) => r.assignmentId === 'a')!
     expect(a.allocatedMinutes).toBeCloseTo(90)
@@ -180,7 +191,7 @@ describe('allocateCapacity（集中配分方式）', () => {
         { assignmentId: 'a', score: 100, remainingMinutes: 200, isUrgent: false },
         { assignmentId: 'b', score: 50, remainingMinutes: 200, isUrgent: false },
       ],
-      90,
+      withOptions({ maxMinutesPerAssignment: 90 }),
     )
     const a = result.find((r) => r.assignmentId === 'a')!
     const b = result.find((r) => r.assignmentId === 'b')!
