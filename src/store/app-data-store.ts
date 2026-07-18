@@ -31,6 +31,8 @@ interface AppDataState {
   /** 設定完了後に、期間・勉強可能時間などを後から変更する */
   updateSettings: (settings: UserSettings) => void
   addAssignment: (assignment: Assignment) => void
+  /** 宿題の内容（タイトル・締切・ページ数など）を丸ごと上書きする（詳細編集画面用） */
+  updateAssignment: (updated: Assignment) => void
   /** 宿題を削除する（即削除、確認はUI側の責務） */
   deleteAssignment: (assignmentId: Id) => void
   completeSetup: () => void
@@ -56,6 +58,10 @@ export const useAppDataStore = create<AppDataState>((set) => ({
   updateSettings: (settings) => set({ settings }),
   addAssignment: (assignment) =>
     set((state) => ({ assignments: [...state.assignments, assignment] })),
+  updateAssignment: (updated) =>
+    set((state) => ({
+      assignments: state.assignments.map((a) => (a.id === updated.id ? updated : a)),
+    })),
   deleteAssignment: (assignmentId) =>
     set((state) => ({
       assignments: state.assignments.filter((a) => a.id !== assignmentId),
