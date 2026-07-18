@@ -23,6 +23,7 @@ import { getPageUnitLabel } from '../domain/assignment'
 import { useStudySessionStore } from '../store/study-session-store'
 import { useAppDataStore } from '../store/app-data-store'
 import { calculateTodayRecordedAmount } from '../engine/today-progress'
+import { isWithinVacationPeriod } from '../engine/day-weight'
 
 interface HomeScreenProps {
   date: string
@@ -68,6 +69,31 @@ function isPercentageType(assignment: Assignment | undefined): boolean {
 }
 
 export function HomeScreen({ date, assignments, settings }: HomeScreenProps) {
+  const isVacationActive = isWithinVacationPeriod(date, settings)
+
+  if (!isVacationActive) {
+    return (
+      <div className="mx-auto max-w-md">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center shadow-sm">
+          <h2 className="text-sm font-semibold text-amber-800">
+            現在、長期休暇期間外です
+          </h2>
+          <p className="mt-2 text-xs text-amber-700">
+            設定されている休暇期間: {settings.vacationPeriod.startDate} 〜{' '}
+            {settings.vacationPeriod.endDate}
+          </p>
+          <p className="mt-1 text-xs text-amber-600">
+            この期間の外では宿題の予定は組まれません。休暇期間は「設定」タブから変更できます。
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return <HomeScreenContent date={date} assignments={assignments} settings={settings} />
+}
+
+function HomeScreenContent({ date, assignments, settings }: HomeScreenProps) {
   const data = getHomeScreenData(date, assignments, settings)
   const sessions = useStudySessionStore((s) => s.sessions)
   const todaySnapshot = useAppDataStore((s) => s.todaySnapshot)
