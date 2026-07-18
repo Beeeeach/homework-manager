@@ -64,6 +64,39 @@ export interface DeadlineBufferSettings {
   percentage: number
 }
 
+/**
+ * ⑥ 詳細設定（スケジューリングの挙動を調整する上級者向けオプション）
+ * これまでconfig/constants.tsに固定値として埋め込まれていた値のうち、
+ * ユーザーのスケジューリング体験に直接影響するものを、後から調整できるようにする。
+ * 全項目任意（省略時はDEFAULT_ADVANCED_SCHEDULING_SETTINGSの値を使う）。
+ * 「普段は固定値のままで、変えたい人だけ変えられる」という後方互換を保つため、
+ * UserSettings全体ではなくこのまとまりに閉じ込めている。
+ */
+export interface AdvancedSchedulingSettings {
+  /** 1日のうち、1つの宿題に使ってよい時間の上限（分）。同じ宿題への1日中の偏りを防ぐ */
+  maxMinutesPerAssignmentPerDay: number
+  /** 集中配分の1ブロックあたりの時間（分）。これ未満の端数時間は原則配分しない */
+  blockMinutes: number
+  /** 1日に手をつける宿題の最大件数 */
+  maxAssignmentsPerDay: number
+  /** オーバーロード警告の安全係数（0〜1）。小さいほど余裕を厳しく見て警告が出やすくなる */
+  overloadSafetyFactor: number
+  /** リスケジュールのレベル1（近傍再配分）で見る日数 */
+  nearRangeDays: number
+  /** リスケジュールのレベル2（中距離再配分）で見る日数 */
+  mediumRangeDays: number
+}
+
+/** 詳細設定のデフォルト値（これまでconfig/constants.tsにあった固定値と同じ） */
+export const DEFAULT_ADVANCED_SCHEDULING_SETTINGS: AdvancedSchedulingSettings = {
+  maxMinutesPerAssignmentPerDay: 90,
+  blockMinutes: 30,
+  maxAssignmentsPerDay: 3,
+  overloadSafetyFactor: 0.9,
+  nearRangeDays: 3,
+  mediumRangeDays: 7,
+}
+
 /** 初回設定全体をまとめたもの */
 export interface UserSettings {
   vacationPeriod: VacationPeriod
@@ -73,10 +106,12 @@ export interface UserSettings {
   deadlineBuffer: DeadlineBufferSettings
   /**
    * 1日のうち、1つの宿題に使ってよい時間の上限（分）。
-   * 集中配分（allocate-capacity.ts）で、同じ宿題に1日中偏らないようにするための上限。
-   * 省略時はDEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAYを使う（後方互換のため任意項目）。
+   * @deprecated advancedScheduling.maxMinutesPerAssignmentPerDayに統合された。
+   * 後方互換のため残しているが、新規保存分はadvancedScheduling側を使う。
    */
   maxMinutesPerAssignmentPerDay?: number
+  /** スケジューリングの詳細設定（任意。省略時はDEFAULT_ADVANCED_SCHEDULING_SETTINGSを使う） */
+  advancedScheduling?: AdvancedSchedulingSettings
 }
 
 /** deadlineBufferのデフォルト値（固定2日前倒し） */
@@ -89,7 +124,23 @@ export const DEFAULT_DEADLINE_BUFFER: DeadlineBufferSettings = {
 /** maxMinutesPerAssignmentPerDayのデフォルト値（1宿題1日あたり90分まで） */
 export const DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY = 90
 
+/**
+ * UserSettingsから詳細設定を取得する（未指定ならデフォルト値）。
+ * 後方互換のため、advancedSchedulingが無い場合は旧フィールド
+ * maxMinutesPerAssignmentPerDayの値があればそれを優先して使う。
+ */
+export function getAdvancedSchedulingSettings(
+  settings: UserSettings,
+): AdvancedSchedulingSettings {
+  if (settings.advancedScheduling) return settings.advancedScheduling
+  return {
+    ...DEFAULT_ADVANCED_SCHEDULING_SETTINGS,
+    maxMinutesPerAssignmentPerDay:
+      settings.maxMinutesPerAssignmentPerDay ?? DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY,
+  }
+}
+
 /** UserSettingsからmaxMinutesPerAssignmentPerDayを取得する（未指定ならデフォルト値） */
 export function getMaxMinutesPerAssignmentPerDay(settings: UserSettings): number {
-  return settings.maxMinutesPerAssignmentPerDay ?? DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY
+  return getAdvancedSchedulingSettings(settings).maxMinutesPerAssignmentPerDay
 }
