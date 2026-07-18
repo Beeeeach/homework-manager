@@ -25,7 +25,7 @@ describe('scheduleForDay（統合）', () => {
     expect(result.allocations[0].excludedByMinimum).toBe(false)
   })
 
-  it('複数宿題は優先度の高い順に集中配分され、締切が近い方がより多く配分される', () => {
+  it('複数宿題は優先度の高い順に集中配分され、締切が近い方がより多く配分される（ただし1宿題あたりの1日上限を超えない）', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
@@ -49,12 +49,12 @@ describe('scheduleForDay（統合）', () => {
     const urgentAlloc = result.allocations.find((a) => a.assignmentId === 'urgent')!
     const relaxedAlloc = result.allocations.find((a) => a.assignmentId === 'relaxed')!
 
-    // urgentが先に配分され、残り時間100分をまるごと得る（capacity100分ちょうど使い切る）
-    expect(urgentAlloc.allocatedMinutes).toBeCloseTo(100)
+    // urgentが先に配分されるが、1宿題あたりの1日上限（デフォルト90分）で頭打ちになる
+    expect(urgentAlloc.allocatedMinutes).toBeCloseTo(90)
     expect(urgentAlloc.excludedByMinimum).toBe(false)
-    // capacityが尽きたため、relaxedはその日は割り当てなし
-    expect(relaxedAlloc.allocatedMinutes).toBe(0)
-    expect(relaxedAlloc.excludedByMinimum).toBe(true)
+    // 余った10分がrelaxedに回る（1日中同じ宿題に偏らないようにするための仕様）
+    expect(relaxedAlloc.allocatedMinutes).toBeCloseTo(10)
+    expect(relaxedAlloc.excludedByMinimum).toBe(false)
   })
 
   it('完了済みの宿題は対象から除外される', () => {
@@ -203,7 +203,7 @@ describe('scheduleForDay（統合）', () => {
     expect(projectAlloc!.allocatedMinutes).toBeGreaterThan(0)
   })
 
-  it('requiredDays未指定の創作・プロジェクト型は、従来通り通常の集中配分のみで扱われる', () => {
+  it('requiredDays未指定の創作・プロジェクト型は、従来通り通常の集中配分のみで扱われる（ただし1日上限の対象にはなる）', () => {
     const settings = makeUserSettings({
       weekdayStudyMinutes: { 0: 100, 1: 100, 2: 100, 3: 100, 4: 100, 5: 100, 6: 100 },
     })
@@ -215,7 +215,7 @@ describe('scheduleForDay（統合）', () => {
     })
     const result = scheduleForDay('2026-07-20', [project], settings)
     const projectAlloc = result.allocations.find((a) => a.assignmentId === 'project')!
-    // 通常の集中配分により、capacity分（100分）が配分される
-    expect(projectAlloc.allocatedMinutes).toBeCloseTo(100)
+    // 通常の集中配分だが、1宿題あたりの1日上限（デフォルト90分）で頭打ちになる
+    expect(projectAlloc.allocatedMinutes).toBeCloseTo(90)
   })
 })
