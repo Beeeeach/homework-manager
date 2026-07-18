@@ -25,10 +25,11 @@ describe('getHomeScreenData', () => {
     })
     const data = getHomeScreenData('2026-07-20', [urgent, relaxed], settings)
     expect(data.todayTasks[0].assignmentId).toBe('urgent')
-    // urgentは1宿題あたりの1日上限（デフォルト90分）で頭打ちになり、
-    // 余った10分がrelaxedに回るため、合計はcapacity100分ちょうどになる
-    expect(data.totalPlannedMinutes).toBeCloseTo(100)
-    expect(data.remainingCapacityMinutes).toBeCloseTo(0)
+    // urgentは1宿題あたりの1日上限（デフォルト90分）で頭打ちになる。
+    // 余った10分はBLOCK_MINUTES未満のため、緊急でないrelaxedはこの日は配分されず、
+    // capacityの一部（10分）は使われずに残る（集中配分方式の趣旨：端数を無理に埋めない）
+    expect(data.totalPlannedMinutes).toBeCloseTo(90)
+    expect(data.remainingCapacityMinutes).toBeCloseTo(10)
   })
 
   it('全宿題完了なら進捗は1', () => {
