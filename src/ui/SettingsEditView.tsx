@@ -11,6 +11,7 @@
 
 import { useState } from 'react'
 import type {
+  AdvancedSchedulingSettings,
   DeadlineBufferSettings,
   RecurringSchedule,
   SpecialSchedule,
@@ -18,7 +19,7 @@ import type {
   Weekday,
   WeekdayStudyMinutes,
 } from '../domain'
-import { getMaxMinutesPerAssignmentPerDay } from '../domain/settings'
+import { getAdvancedSchedulingSettings } from '../domain/settings'
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   0: '日',
@@ -56,9 +57,10 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
   const [deadlineBuffer, setDeadlineBuffer] = useState<DeadlineBufferSettings>(
     settings.deadlineBuffer,
   )
-  const [maxMinutesPerAssignment, setMaxMinutesPerAssignment] = useState(
-    String(getMaxMinutesPerAssignmentPerDay(settings)),
+  const [advancedScheduling, setAdvancedScheduling] = useState<AdvancedSchedulingSettings>(
+    getAdvancedSchedulingSettings(settings),
   )
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
 
   function applyBulkMinutes() {
     const value = Number(bulkMinutes)
@@ -123,7 +125,7 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
       recurringSchedules,
       specialSchedules,
       deadlineBuffer,
-      maxMinutesPerAssignmentPerDay: Number(maxMinutesPerAssignment) || undefined,
+      advancedScheduling,
     })
   }
 
@@ -375,23 +377,129 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-700">
-          ⑥ 1つの宿題に使う時間の上限（1日あたり）
-        </h2>
+        <button
+          type="button"
+          onClick={() => setIsAdvancedOpen((prev) => !prev)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <h2 className="text-sm font-semibold text-slate-700">⑥ 詳細設定（上級者向け）</h2>
+          <span className="text-xs text-slate-400">{isAdvancedOpen ? '閉じる ▲' : '開く ▼'}</span>
+        </button>
         <p className="mt-1 text-xs text-slate-400">
-          同じ宿題ばかりに1日中偏らないよう、1宿題あたりの上限時間を設定できます。
-          上限に達すると、残りの時間は他の宿題に自動的に回されます。
+          スケジューリングの細かい挙動を調整できます。通常は変更不要です。
         </p>
-        <label className="mt-3 block text-xs text-slate-500">
-          1宿題あたりの上限（分）
-          <input
-            type="number"
-            min={1}
-            value={maxMinutesPerAssignment}
-            onChange={(e) => setMaxMinutesPerAssignment(e.target.value)}
-            className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
-          />
-        </label>
+
+        {isAdvancedOpen && (
+          <div className="mt-3 space-y-3 border-t border-slate-100 pt-3">
+            <label className="block text-xs text-slate-500">
+              1つの宿題に使う時間の上限（1日あたり・分）
+              <input
+                type="number"
+                min={1}
+                value={advancedScheduling.maxMinutesPerAssignmentPerDay}
+                onChange={(e) =>
+                  setAdvancedScheduling((prev) => ({
+                    ...prev,
+                    maxMinutesPerAssignmentPerDay: Number(e.target.value) || prev.maxMinutesPerAssignmentPerDay,
+                  }))
+                }
+                className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+              <span className="mt-1 block text-xs text-slate-400">
+                同じ宿題ばかりに1日中偏らないようにするための上限です。
+              </span>
+            </label>
+
+            <label className="block text-xs text-slate-500">
+              集中配分の最小ブロック時間（分）
+              <input
+                type="number"
+                min={1}
+                value={advancedScheduling.blockMinutes}
+                onChange={(e) =>
+                  setAdvancedScheduling((prev) => ({
+                    ...prev,
+                    blockMinutes: Number(e.target.value) || prev.blockMinutes,
+                  }))
+                }
+                className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+              <span className="mt-1 block text-xs text-slate-400">
+                これ未満の中途半端な時間は、その日は配分せず翌日以降にまとめます。
+              </span>
+            </label>
+
+            <label className="block text-xs text-slate-500">
+              1日に手をつける宿題の最大件数
+              <input
+                type="number"
+                min={1}
+                value={advancedScheduling.maxAssignmentsPerDay}
+                onChange={(e) =>
+                  setAdvancedScheduling((prev) => ({
+                    ...prev,
+                    maxAssignmentsPerDay: Number(e.target.value) || prev.maxAssignmentsPerDay,
+                  }))
+                }
+                className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+            </label>
+
+            <label className="block text-xs text-slate-500">
+              オーバーロード警告の安全係数（0〜1）
+              <input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={advancedScheduling.overloadSafetyFactor}
+                onChange={(e) =>
+                  setAdvancedScheduling((prev) => ({
+                    ...prev,
+                    overloadSafetyFactor: Number(e.target.value),
+                  }))
+                }
+                className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+              />
+              <span className="mt-1 block text-xs text-slate-400">
+                小さいほど余裕を厳しく見て、警告が出やすくなります。
+              </span>
+            </label>
+
+            <div className="flex gap-2">
+              <label className="flex-1 text-xs text-slate-500">
+                近距離リスケジュール（日）
+                <input
+                  type="number"
+                  min={1}
+                  value={advancedScheduling.nearRangeDays}
+                  onChange={(e) =>
+                    setAdvancedScheduling((prev) => ({
+                      ...prev,
+                      nearRangeDays: Number(e.target.value) || prev.nearRangeDays,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="flex-1 text-xs text-slate-500">
+                中距離リスケジュール（日）
+                <input
+                  type="number"
+                  min={1}
+                  value={advancedScheduling.mediumRangeDays}
+                  onChange={(e) =>
+                    setAdvancedScheduling((prev) => ({
+                      ...prev,
+                      mediumRangeDays: Number(e.target.value) || prev.mediumRangeDays,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-md border border-slate-300 px-2 py-1 text-sm"
+                />
+              </label>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
