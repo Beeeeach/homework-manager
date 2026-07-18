@@ -52,9 +52,10 @@ describe('scheduleForDay（統合）', () => {
     // urgentが先に配分されるが、1宿題あたりの1日上限（デフォルト90分）で頭打ちになる
     expect(urgentAlloc.allocatedMinutes).toBeCloseTo(90)
     expect(urgentAlloc.excludedByMinimum).toBe(false)
-    // 余った10分がrelaxedに回る（1日中同じ宿題に偏らないようにするための仕様）
-    expect(relaxedAlloc.allocatedMinutes).toBeCloseTo(10)
-    expect(relaxedAlloc.excludedByMinimum).toBe(false)
+    // 余った10分はBLOCK_MINUTES（30分）未満のため、緊急でないrelaxedはこの日はスキップされる
+    // （中途半端な端数時間を配分せず、翌日以降にまとめて集中配分するのが集中配分方式の趣旨）
+    expect(relaxedAlloc.allocatedMinutes).toBe(0)
+    expect(relaxedAlloc.excludedByMinimum).toBe(true)
   })
 
   it('完了済みの宿題は対象から除外される', () => {
