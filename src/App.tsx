@@ -7,6 +7,7 @@ import { ProgressView } from './ui/ProgressView'
 import { ResetConfirmView } from './ui/ResetConfirmView'
 import { SettingsEditView } from './ui/SettingsEditView'
 import { LoginScreen } from './ui/LoginScreen'
+import { AssignmentDetailView } from './ui/AssignmentDetailView'
 import { useAppDataStore } from './store/app-data-store'
 import { useStudySessionStore } from './store/study-session-store'
 import { createLocalStorageRepository } from './data/local-storage-repository'
@@ -40,9 +41,11 @@ function App() {
     setSettings,
     updateSettings,
     addAssignment,
+    updateAssignment,
     deleteAssignment,
     completeSetup,
   } = useAppDataStore()
+  const recordProgress = useAppDataStore((s) => s.recordProgress)
   const resetAllAppData = useAppDataStore((s) => s.resetAll)
   const resetAllSessions = useStudySessionStore((s) => s.resetAll)
   const sessions = useStudySessionStore((s) => s.sessions)
@@ -51,10 +54,11 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('home')
   const [skipLogin, setSkipLogin] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null)
   const learningStoreRef = useRef<LearningRecordStore>({})
   const repositoryRef = useRef<AppRepository>(localRepository)
 
-  const { user, isAuthResolved, signInWithGoogle, signOut } = useAuth()
+  const { user, isAuthResolved, signInWithGoogle, signOut, redirectError } = useAuth()
 
   // ログイン状態が確定したら、使うリポジトリを決めてデータを読み込む
   // （ログイン中はFirestore、未ログイン・スキップ時はlocalStorage）
@@ -80,6 +84,8 @@ function App() {
   async function handleSignIn() {
     setAuthError(null)
     try {
+      // signInWithRedirectはページ全体を遷移させるため、通常はこの後の行に到達しない。
+      // 失敗した場合（ブラウザ制約等で遷移自体が起きない場合）のみcatchに入る。
       await signInWithGoogle()
     } catch {
       setAuthError('ログインに失敗しました。もう一度お試しください。')
@@ -99,7 +105,7 @@ function App() {
   if (!user && !skipLogin) {
     return (
       <div>
-        <LoginScreen onSignIn={handleSignIn} errorMessage={authError} />
+        <LoginScreen onSignIn={handleSignIn} errorMessage={authError ?? redirectError} />
         <div className="mx-auto -mt-2 max-w-sm px-6 pb-6 text-center">
           <button
             type="button"
@@ -197,17 +203,40 @@ function App() {
         {activeTab === 'progress' && (
           <ProgressView date={TODAY} assignments={assignments} />
         )}
-        {activeTab === 'add' && (
-          <AssignmentForm
-            existingAssignments={assignments}
-            settings={settings}
-            currentDate={TODAY}
-            onAdd={addAssignment}
-            onDelete={deleteAssignment}
-            onFinish={() => setActiveTab('home')}
-            finishLabel="ホームに戻る"
-          />
-        )}
+        {activeTab === 'add' && (() => {
+          const selectedAssignment = assignments.find((a) => a.id === selectedAssignmentId)
+          if (selectedAssignment) {
+            return (
+              <AssignmentDetailView
+                assignment={selectedAssignment}
+                onSave={(updated) => {
+                  updateAssignment(updated)
+                  setSelectedAssignmentId(null)
+                }}
+                onRecordAmount={(assignmentId, amount, phaseId) => {
+                  recordProgress(assignmentId, { amount, phaseId })
+                }}
+                onDelete={(assignmentId) => {
+                  deleteAssignment(assignmentId)
+                  setSelectedAssignmentId(null)
+                }}
+                onClose={() => setSelectedAssignmentId(null)}
+              />
+            )
+          }
+          return (
+            <AssignmentForm
+              existingAssignments={assignments}
+              settings={settings}
+              currentDate={TODAY}
+              onAdd={addAssignment}
+              onDelete={deleteAssignment}
+              onSelectAssignment={setSelectedAssignmentId}
+              onFinish={() => setActiveTab('home')}
+              finishLabel="ホームに戻る"
+            />
+          )
+        })()}
         {activeTab === 'settings' && (
           <SettingsEditView
             settings={settings}
