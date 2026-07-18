@@ -16,7 +16,7 @@ import type {
   Weekday,
   WeekdayStudyMinutes,
 } from '../domain'
-import { DEFAULT_DEADLINE_BUFFER, DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY } from '../domain/settings'
+import { DEFAULT_DEADLINE_BUFFER } from '../domain/settings'
 import { getTodayDateString, addDays } from '../engine/date-utils'
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
@@ -61,9 +61,6 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [specialSchedules, setSpecialSchedules] = useState<SpecialSchedule[]>([])
   const [deadlineBuffer, setDeadlineBuffer] = useState<DeadlineBufferSettings>(
     DEFAULT_DEADLINE_BUFFER,
-  )
-  const [maxMinutesPerAssignment, setMaxMinutesPerAssignment] = useState(
-    String(DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY),
   )
 
   function applyBulkMinutes() {
@@ -133,7 +130,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       recurringSchedules,
       specialSchedules,
       deadlineBuffer,
-      maxMinutesPerAssignmentPerDay: Number(maxMinutesPerAssignment) || undefined,
+      // advancedSchedulingは初回設定では出さず、未指定のままにする
+      // （getAdvancedSchedulingSettingsがデフォルト値を補ってくれる）
     })
   }
 
@@ -470,19 +468,10 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
             </label>
           )}
 
-          <label className="mt-4 block text-xs text-slate-500">
-            1つの宿題に使う時間の上限（1日あたり・分）
-            <input
-              type="number"
-              min={1}
-              value={maxMinutesPerAssignment}
-              onChange={(e) => setMaxMinutesPerAssignment(e.target.value)}
-              className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
-            />
-            <span className="mt-1 block text-xs text-slate-400">
-              同じ宿題ばかりに1日中偏らないようにするための上限です。
-            </span>
-          </label>
+          <p className="mt-4 text-xs text-slate-400">
+            より細かい設定（1宿題あたりの時間上限など）は、初回設定完了後に
+            「設定」タブの詳細設定から変更できます。
+          </p>
 
           <div className="mt-4 flex gap-2">
             <button
