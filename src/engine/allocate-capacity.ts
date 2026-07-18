@@ -4,7 +4,7 @@
  * 【改訂の背景】
  * 旧方式はその日のcapacityを対象宿題全件でスコア比率按分していたため、
  * 「5件あれば5件全部を毎日少しずつ」になり非効率だった。
- * 改訂版は、優先度スコアの高い宿題から順に「BLOCK_MINUTES以上のまとまった時間」を
+ * 改訂版は、優先度スコアの高い宿題から順に「blockMinutes以上のまとまった時間」を
  * 割り当てる集中配分方式に変更する。
  *
  * さらに、1つの宿題が1日中capacityを独占してしまう問題（例: 1日中同じ宿題だけ）を
@@ -12,14 +12,20 @@
  * 上限に達したら、その宿題への配分はそこで打ち切り、余ったcapacityは
  * 次の優先度の宿題に回す。
  *
+ * 【設定化】(新規)
+ * blockMinutes・maxAssignmentsPerDay・maxMinutesPerAssignmentは、
+ * 以前はconfig/constants.tsの固定値だったが、UserSettings.advancedSchedulingから
+ * 渡せるようにし、ユーザーが「詳細設定」で調整できるようにした。
+ * 呼び出し側（schedule-day.ts）がoptionsとしてまとめて渡す。
+ *
  * 【アルゴリズム】
  *   1. スコアの高い順に対象宿題をソートする
  *   2. 上から順に、以下を「残りcapacityが尽きる」「対象がなくなる」
- *      「割当件数がMAX_ASSIGNMENTS_PER_DAYに達する」のいずれかまで繰り返す:
+ *      「割当件数がmaxAssignmentsPerDayに達する」のいずれかまで繰り返す:
  *        a. 割当候補 = min(その宿題の残り予想時間, 残りcapacity, maxMinutesPerAssignment)
- *        b. 割当候補 >= BLOCK_MINUTES なら、その分を配分し、
+ *        b. 割当候補 >= blockMinutes なら、その分を配分し、
  *           残りcapacityを減らし、割当件数を1増やして次の宿題へ
- *        c. 割当候補 < BLOCK_MINUTES の場合:
+ *        c. 割当候補 < blockMinutes の場合:
  *             - 緊急（今日を含め残り1日しかない）なら、候補分をそのまま配分する
  *               （終わらないよりはマシなので、少量でも実行する）
  *             - 緊急でなければこの宿題はスキップ（0分）し、次の宿題を試す
@@ -33,8 +39,6 @@
  * 緊急宿題が終わらない可能性はあるため、翌日以降により強く優先される
  * （優先度スコア自体は残り時間ベースで変わらず高いまま）。
  */
-
-import { BLOCK_MINUTES, MAX_ASSIGNMENTS_PER_DAY } from '../config/constants'
 
 export interface AllocationInput {
   assignmentId: string
@@ -53,11 +57,22 @@ export interface AllocationResult {
   excludedByMinimum: boolean
 }
 
+export interface AllocateCapacityOptions {
+  /** 集中配分の1ブロックあたりの時間（分）。これ未満の端数は原則配分しない */
+  blockMinutes: number
+  /** 1日に手をつける宿題の最大件数 */
+  maxAssignmentsPerDay: number
+  /** 1日のうち、1つの宿題に使ってよい時間の上限（分） */
+  maxMinutesPerAssignment: number
+}
+
 export function allocateCapacity(
   capacityMinutes: number,
   inputs: AllocationInput[],
-  maxMinutesPerAssignment: number,
+  options: AllocateCapacityOptions,
 ): AllocationResult[] {
+  const { blockMinutes, maxAssignmentsPerDay, maxMinutesPerAssignment } = options
+
   if (capacityMinutes <= 0 || inputs.length === 0) {
     return inputs.map((i) => ({
       assignmentId: i.assignmentId,
@@ -78,7 +93,7 @@ export function allocateCapacity(
   let assignedCount = 0
 
   for (const item of sorted) {
-    if (remainingCapacity <= 0 || assignedCount >= MAX_ASSIGNMENTS_PER_DAY) {
+    if (remainingCapacity <= 0 || assignedCount >= maxAssignmentsPerDay) {
       results.push({
         assignmentId: item.assignmentId,
         allocatedMinutes: 0,
@@ -93,7 +108,7 @@ export function allocateCapacity(
       maxMinutesPerAssignment,
     )
 
-    if (candidate >= BLOCK_MINUTES) {
+    if (candidate >= blockMinutes) {
       results.push({
         assignmentId: item.assignmentId,
         allocatedMinutes: candidate,
