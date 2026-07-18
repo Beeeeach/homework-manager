@@ -20,9 +20,20 @@
  * 侵食してしまう場合は、他の必要ペース分を残した「部分確保」に切り替える。
  * これも反復型と同様、通常の集中配分の対象からは独立した固定枠として扱う。
  *
- * 注意: findBestConsecutiveWindowは対象期間全体を毎回計算するため、
- * この関数を日ごとに繰り返し呼ぶ（例: 複数日予測）場合はやや非効率。
- * 将来的にはキャッシュ等の最適化の余地がある。
+ * 【締切バッファの動的判定】(新規)
+ * 通常の集中配分対象（page/repetitionで固定枠以外）は、実効締切までに
+ * 間に合う見込みがある場合、実効締切より後（バッファ期間）はその日の
+ * スケジューリング対象から除外する（deadline-buffer-check.ts）。
+ * 進捗が遅れて実効締切までに間に合わない見込みになった場合は、
+ * 自動的にバッファが解放され、本来の締切まで対象になる。
+ *
+ * 【1宿題あたりの1日上限】(新規)
+ * 1つの宿題が1日中capacityを独占するのを防ぐため、settings.maxMinutesPerAssignmentPerDay
+ * を allocateCapacity に渡し、1宿題への配分がその上限を超えないようにする。
+ *
+ * 注意: findBestConsecutiveWindowやisDateWithinSchedulableRangeは対象期間全体を
+ * 毎回計算するため、この関数を日ごとに繰り返し呼ぶ（例: 複数日予測）場合は
+ * やや非効率。将来的にはキャッシュ等の最適化の余地がある。
  */
 
 import type {
@@ -40,6 +51,8 @@ import type { AllocationResult } from './allocate-capacity'
 import type { UserSettings } from '../domain'
 import { isOccurrenceDay, calculateItemsPerOccurrence } from './repetition-frequency'
 import { findBestConsecutiveWindow, calculateReservableMinutes } from './required-days-reservation'
+import { isDateWithinSchedulableRange } from './deadline-buffer-check'
+import { getMaxMinutesPerAssignmentPerDay } from '../domain/settings'
 
 export interface DayScheduleResult {
   date: DateString
@@ -74,6 +87,7 @@ export function scheduleForDay(
 ): DayScheduleResult {
   const capacityMinutes = getCapacityMinutes(date, settings)
   const dayWeight = getDayWeight(date, settings)
+  const maxMinutesPerAssignment = getMaxMinutesPerAssignmentPerDay(settings)
 
   // 完了済み、および「頻度指定つき反復型で今日が実施日でないもの」を対象から除外する
   const candidates = assignments.filter((a) => {
@@ -144,8 +158,14 @@ export function scheduleForDay(
     return false
   })
 
-  // --- 3. 残りは通常の集中配分（スコア順30分ブロック） ---
-  const scored = flexibleCandidates.map((a) => {
+  // --- 3. 締切バッファの動的判定：実効締切までに間に合う見込みなら、
+  //        バッファ期間（実効締切より後）はこの日の対象から除外する ---
+  const bufferFilteredCandidates = flexibleCandidates.filter((a) =>
+    isDateWithinSchedulableRange(a, date, date, settings),
+  )
+
+  // --- 4. 残りは通常の集中配分（スコア順30分ブロック、1宿題あたり上限つき） ---
+  const scored = bufferFilteredCandidates.map((a) => {
     const priorityScore = calculatePriority(a, date, settings)
     const finalScore = priorityScore * dayWeight
     return { assignment: a, priorityScore, finalScore }
@@ -158,7 +178,11 @@ export function scheduleForDay(
     isUrgent: isUrgent(date, s.assignment.deadline),
   }))
 
-  const results = allocateCapacity(remainingCapacityAfterFixed, allocationInputs)
+  const results = allocateCapacity(
+    remainingCapacityAfterFixed,
+    allocationInputs,
+    maxMinutesPerAssignment,
+  )
 
   const flexibleAllocations = results.map((r) => {
     const scoreInfo = scored.find((s) => s.assignment.id === r.assignmentId)!
