@@ -71,6 +71,12 @@ export interface UserSettings {
   recurringSchedules: RecurringSchedule[]
   specialSchedules: SpecialSchedule[]
   deadlineBuffer: DeadlineBufferSettings
+  /**
+   * 1日のうち、1つの宿題に使ってよい時間の上限（分）。
+   * 集中配分（allocate-capacity.ts）で、同じ宿題に1日中偏らないようにするための上限。
+   * 省略時はDEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAYを使う（後方互換のため任意項目）。
+   */
+  maxMinutesPerAssignmentPerDay?: number
 }
 
 /** deadlineBufferのデフォルト値（固定2日前倒し） */
@@ -78,4 +84,12 @@ export const DEFAULT_DEADLINE_BUFFER: DeadlineBufferSettings = {
   mode: 'fixed',
   fixedDays: 2,
   percentage: 0.2,
+}
+
+/** maxMinutesPerAssignmentPerDayのデフォルト値（1宿題1日あたり90分まで） */
+export const DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY = 90
+
+/** UserSettingsからmaxMinutesPerAssignmentPerDayを取得する（未指定ならデフォルト値） */
+export function getMaxMinutesPerAssignmentPerDay(settings: UserSettings): number {
+  return settings.maxMinutesPerAssignmentPerDay ?? DEFAULT_MAX_MINUTES_PER_ASSIGNMENT_PER_DAY
 }
