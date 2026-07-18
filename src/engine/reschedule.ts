@@ -14,10 +14,13 @@
  * 「未完了残タスク時間」は、Taskがその日ごとに動的生成される設計（scheduleForDay）のため、
  * 実質的に「全Assignmentの残り予想時間の合計」と同一に扱う（オーバーロード検出と同じ考え方）。
  * 「空きcapacity」は対象範囲の各日のcapacity合計。
+ *
+ * 変更点: NearRange・MediumRangeの日数は、これまでconfig/constants.tsの固定値だったが、
+ * UserSettings.advancedSchedulingから取得するようにした。ユーザーが「詳細設定」で調整できる。
  */
 
 import type { Assignment, DateString, UserSettings } from '../domain'
-import { NEAR_RANGE_DAYS, MEDIUM_RANGE_DAYS } from '../config/constants'
+import { getAdvancedSchedulingSettings } from '../domain/settings'
 import { getTotalRemainingMinutes } from './overload-check'
 import { getCapacityMinutes } from './day-weight'
 import { addDays, dateRange, isOnOrBefore } from './date-utils'
@@ -62,9 +65,10 @@ export function decideRescheduleRange(
 ): RescheduleRangeDecision {
   const totalRemainingMinutes = getTotalRemainingMinutes(assignments)
   const vacationEnd = settings.vacationPeriod.endDate
+  const { nearRangeDays, mediumRangeDays } = getAdvancedSchedulingSettings(settings)
 
   // レベル1: NearRange
-  const nearDates = getBoundedRange(currentDate, NEAR_RANGE_DAYS, vacationEnd)
+  const nearDates = getBoundedRange(currentDate, nearRangeDays, vacationEnd)
   const nearCapacity = sumCapacity(nearDates, settings)
   if (nearCapacity >= totalRemainingMinutes) {
     return {
@@ -76,7 +80,7 @@ export function decideRescheduleRange(
   }
 
   // レベル2: MediumRange
-  const mediumDates = getBoundedRange(currentDate, MEDIUM_RANGE_DAYS, vacationEnd)
+  const mediumDates = getBoundedRange(currentDate, mediumRangeDays, vacationEnd)
   const mediumCapacity = sumCapacity(mediumDates, settings)
   if (mediumCapacity >= totalRemainingMinutes) {
     return {
