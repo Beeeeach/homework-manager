@@ -18,6 +18,7 @@ import type {
   Weekday,
   WeekdayStudyMinutes,
 } from '../domain'
+import { getMaxMinutesPerAssignmentPerDay } from '../domain/settings'
 
 const WEEKDAY_LABELS: Record<Weekday, string> = {
   0: '日',
@@ -54,6 +55,9 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
   )
   const [deadlineBuffer, setDeadlineBuffer] = useState<DeadlineBufferSettings>(
     settings.deadlineBuffer,
+  )
+  const [maxMinutesPerAssignment, setMaxMinutesPerAssignment] = useState(
+    String(getMaxMinutesPerAssignmentPerDay(settings)),
   )
 
   function applyBulkMinutes() {
@@ -119,6 +123,7 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
       recurringSchedules,
       specialSchedules,
       deadlineBuffer,
+      maxMinutesPerAssignmentPerDay: Number(maxMinutesPerAssignment) || undefined,
     })
   }
 
@@ -367,6 +372,26 @@ export function SettingsEditView({ settings, onSave, onCancel }: SettingsEditVie
             </div>
           </label>
         )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-700">
+          ⑥ 1つの宿題に使う時間の上限（1日あたり）
+        </h2>
+        <p className="mt-1 text-xs text-slate-400">
+          同じ宿題ばかりに1日中偏らないよう、1宿題あたりの上限時間を設定できます。
+          上限に達すると、残りの時間は他の宿題に自動的に回されます。
+        </p>
+        <label className="mt-3 block text-xs text-slate-500">
+          1宿題あたりの上限（分）
+          <input
+            type="number"
+            min={1}
+            value={maxMinutesPerAssignment}
+            onChange={(e) => setMaxMinutesPerAssignment(e.target.value)}
+            className="mt-1 w-32 rounded-md border border-slate-300 px-2 py-1 text-sm"
+          />
+        </label>
       </div>
 
       <div className="flex gap-2">
