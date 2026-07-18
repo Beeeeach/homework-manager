@@ -7,11 +7,16 @@
  * 改訂版は、優先度スコアの高い宿題から順に「BLOCK_MINUTES以上のまとまった時間」を
  * 割り当てる集中配分方式に変更する。
  *
+ * さらに、1つの宿題が1日中capacityを独占してしまう問題（例: 1日中同じ宿題だけ）を
+ * 防ぐため、1宿題あたりの1日の上限時間（maxMinutesPerAssignment）を導入した。
+ * 上限に達したら、その宿題への配分はそこで打ち切り、余ったcapacityは
+ * 次の優先度の宿題に回す。
+ *
  * 【アルゴリズム】
  *   1. スコアの高い順に対象宿題をソートする
  *   2. 上から順に、以下を「残りcapacityが尽きる」「対象がなくなる」
  *      「割当件数がMAX_ASSIGNMENTS_PER_DAYに達する」のいずれかまで繰り返す:
- *        a. 割当候補 = min(その宿題の残り予想時間, 残りcapacity)
+ *        a. 割当候補 = min(その宿題の残り予想時間, 残りcapacity, maxMinutesPerAssignment)
  *        b. 割当候補 >= BLOCK_MINUTES なら、その分を配分し、
  *           残りcapacityを減らし、割当件数を1増やして次の宿題へ
  *        c. 割当候補 < BLOCK_MINUTES の場合:
@@ -21,6 +26,12 @@
  *               （件数にはカウントしない＝上限を消費しない）
  *   3. 余ったcapacityがあっても、上限件数や候補切れで打ち切られた場合は
  *      次の宿題には回さない（意図的に余らせる。集中配分の趣旨のため）
+ *
+ * 注意: maxMinutesPerAssignmentは緊急時（isUrgent）でも適用される。
+ * 緊急な宿題が1日の上限を超えて残っている場合でも、その日は上限までしか
+ * 配分しない（1日に集中させすぎない方針を優先するため）。ただしこれにより
+ * 緊急宿題が終わらない可能性はあるため、翌日以降により強く優先される
+ * （優先度スコア自体は残り時間ベースで変わらず高いまま）。
  */
 
 import { BLOCK_MINUTES, MAX_ASSIGNMENTS_PER_DAY } from '../config/constants'
@@ -45,6 +56,7 @@ export interface AllocationResult {
 export function allocateCapacity(
   capacityMinutes: number,
   inputs: AllocationInput[],
+  maxMinutesPerAssignment: number,
 ): AllocationResult[] {
   if (capacityMinutes <= 0 || inputs.length === 0) {
     return inputs.map((i) => ({
@@ -75,7 +87,11 @@ export function allocateCapacity(
       continue
     }
 
-    const candidate = Math.min(item.remainingMinutes, remainingCapacity)
+    const candidate = Math.min(
+      item.remainingMinutes,
+      remainingCapacity,
+      maxMinutesPerAssignment,
+    )
 
     if (candidate >= BLOCK_MINUTES) {
       results.push({
