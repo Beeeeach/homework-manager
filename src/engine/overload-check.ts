@@ -7,10 +7,14 @@
  *
  * 宿題を1件登録するたびに実行する簡易チェック。
  * ブロッキングではなく、あくまで注意喚起（登録自体は継続できる）。
+ *
+ * 変更点: 安全係数（overloadSafetyFactor）はこれまでconfig/constants.tsの
+ * 固定値だったが、UserSettings.advancedSchedulingから取得するようにした。
+ * ユーザーが「詳細設定」で調整できる。
  */
 
 import type { Assignment, DateString, UserSettings } from '../domain'
-import { OVERLOAD_SAFETY_FACTOR } from '../config/constants'
+import { getAdvancedSchedulingSettings } from '../domain/settings'
 import { getRemainingMinutes } from './remaining-time'
 import { getCapacityMinutes } from './day-weight'
 import { dateRange } from './date-utils'
@@ -64,7 +68,8 @@ export function checkOverload(
 ): OverloadCheckResult {
   const totalRemainingMinutes = getTotalRemainingMinutes(assignments)
   const totalAvailableMinutes = getTotalAvailableMinutes(currentDate, settings)
-  const threshold = totalAvailableMinutes * OVERLOAD_SAFETY_FACTOR
+  const overloadSafetyFactor = getAdvancedSchedulingSettings(settings).overloadSafetyFactor
+  const threshold = totalAvailableMinutes * overloadSafetyFactor
 
   return {
     isOverloaded: totalRemainingMinutes > threshold,
